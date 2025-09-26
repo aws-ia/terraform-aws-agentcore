@@ -1,6 +1,180 @@
 <!-- BEGIN_TF_DOCS -->
 # AgentCore Module
 
+The [Amazon Bedrock AgentCore](https://aws.amazon.com/bedrock/agentcore/) Terraform module provides a high-level, object-oriented approach to creating and managing Amazon Bedrock AgentCore resources using Terraform. This module abstracts away the complexity of the L1 resources and provides a higher level implementation.
+
+## Overview
+
+The module provides support for Amazon Bedrock AgentCore Runtime and Runtime Endpoints. This allows you to deploy custom container-based runtimes for your Bedrock agents. You can extend agent capabilities with custom code that runs in your own container, giving you full control over the agent's behavior and integration capabilities.
+
+This module simplifies the process of:
+- Creating and configuring Bedrock AgentCore Runtimes
+- Setting up AgentCore Runtime Endpoints
+- Managing IAM permissions for your runtimes
+- Configuring network access and security settings
+
+## Features
+
+- **Custom Container Support**: Deploy your own container images from Amazon ECR
+- **Flexible Networking**: Support for both PUBLIC and VPC network modes
+- **IAM Role Management**: Automatic creation of IAM roles with appropriate permissions
+- **Environment Variables**: Pass configuration to your runtime container
+- **JWT Authorization**: Optional JWT authorizer configuration for secure access
+- **Endpoint Management**: Create and manage runtime endpoints for client access
+
+## Usage
+
+### Basic Runtime and Endpoint
+
+```hcl
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.1"
+  # Enable Agent Core Runtime
+  create_runtime = true
+  runtime_name = "MyCustomRuntime"
+  runtime_description = "Custom runtime for my Bedrock agent"
+  runtime_container_uri = "123456789012.dkr.ecr.us-east-1.amazonaws.com/bedrock/agent-runtime:latest"
+  runtime_network_mode = "PUBLIC"
+  # Environment variables for the runtime
+  runtime_environment_variables = {
+    "LOG_LEVEL" = "INFO"
+    "ENV" = "production"
+  }
+  # Enable Agent Core Runtime Endpoint
+  create_runtime_endpoint = true
+  runtime_endpoint_name = "MyRuntimeEndpoint"
+  runtime_endpoint_description = "Endpoint for my custom runtime"
+}
+```
+
+### With JWT Authorization
+
+```hcl
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.1"
+  # Enable Agent Core Runtime
+  create_runtime = true
+  runtime_name = "SecureRuntime"
+  runtime_container_uri = "123456789012.dkr.ecr.us-east-1.amazonaws.com/bedrock/agent-runtime:latest"
+  # Configure JWT authorization
+  runtime_authorizer_configuration = {
+    custom_jwt_authorizer = {
+      discovery_url = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_example/.well-known/jwks.json"
+      allowed_audience = ["client-id-1", "client-id-2"]
+    }
+  }
+  # Enable Agent Core Runtime Endpoint
+  create_runtime_endpoint = true
+  runtime_endpoint_name = "SecureEndpoint"
+}
+```
+
+### With Custom IAM Role
+
+```hcl
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.1"
+  # Enable Agent Core Runtime with custom IAM role
+  create_runtime = true
+  runtime_name = "CustomRoleRuntime"
+  runtime_container_uri = "123456789012.dkr.ecr.us-east-1.amazonaws.com/bedrock/agent-runtime:latest"
+  runtime_role_arn = "arn:aws:iam::123456789012:role/my-custom-bedrock-role"
+  # Enable Agent Core Runtime Endpoint
+  create_runtime_endpoint = true
+  runtime_endpoint_name = "CustomRoleEndpoint"
+}
+```
+
+## Architecture
+
+The module creates the following resources:
+
+1. **Agent Core Runtime**: A container-based runtime environment for your Bedrock agent
+2. **IAM Role and Policy**: Permissions for the runtime to access AWS services
+3. **Agent Core Runtime Endpoint**: An endpoint for client applications to interact with the runtime
+
+The IAM role includes permissions for:
+- ECR image access
+- CloudWatch Logs
+- X-Ray tracing
+- CloudWatch metrics
+- Bedrock model invocation
+- Workload identity token management
+
+## Prerequisites
+
+To use this module, you need:
+
+1. An AWS account with appropriate permissions
+2. Terraform >= 1.0.7
+3. AWS provider >= 4.0.0
+4. AWSCC provider >= 0.24.0
+5. A container image in Amazon ECR (for the runtime)
+
+## Examples
+
+The module includes examples demonstrating different use cases:
+
+### Agent Runtime with STRANDS Framework
+
+The [agent-runtime](./examples/agent-runtime) example demonstrates:
+- Creating an ECR repository
+- Building and pushing a Docker image
+- Creating a Bedrock Agent Runtime and Endpoint
+- Implementing a STRANDS framework agent with tool-calling capabilities
+
+This example includes:
+- A Python implementation using the STRANDS framework
+- Tools for calculations, weather information, and greetings
+- Testing scripts for local and deployed testing
+
+## Advanced Configuration
+
+### Network Configuration
+
+The module supports both PUBLIC and VPC network modes:
+
+```hcl
+# Public network mode (default)
+runtime_network_mode = "PUBLIC"
+
+# VPC network mode (requires additional configuration)
+runtime_network_mode = "VPC"
+```
+
+### Environment Variables
+
+Pass configuration to your runtime container:
+
+```hcl
+runtime_environment_variables = {
+  "LOG_LEVEL" = "DEBUG"
+  "MODEL_ID" = "anthropic.claude-3-sonnet-20240229-v1:0"
+  "MAX_TOKENS" = "4096"
+}
+```
+
+### Tags
+
+Add tags to your resources:
+
+```hcl
+runtime_tags = {
+  Environment = "production"
+  Project     = "ai-assistants"
+  Owner       = "data-science-team"
+}
+
+runtime_endpoint_tags = {
+  Environment = "production"
+  Project     = "ai-assistants"
+  Owner       = "data-science-team"
+}
+```
+
 ## Requirements
 
 | Name | Version |
