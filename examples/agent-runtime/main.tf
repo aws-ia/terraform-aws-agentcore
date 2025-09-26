@@ -18,9 +18,17 @@ resource "random_id" "suffix" {
 # Create an ECR repository for the agent runtime container
 resource "aws_ecr_repository" "agent_runtime" {
   name = "bedrock/agent-runtime-${random_id.suffix.hex}"
+  image_tag_mutability = "IMMUTABLE"
   
   image_scanning_configuration {
     scan_on_push = true
+  }
+  
+  # Ensure that ECR repositories are encrypted using KMS
+  encryption_configuration {
+    encryption_type = "KMS"
+    # Using the default AWS managed KMS key for ECR
+    # To use a custom key, uncomment and specify: kms_key = "arn:aws:kms:region:account-id:key/key-id"
   }
 }
 
