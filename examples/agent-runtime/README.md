@@ -24,6 +24,7 @@ The example includes a comprehensive implementation of an agent runtime using th
 - `invoke_runtime.py`: A client script for testing the deployed runtime
 
 The agent implementation includes several tools:
+
 - Calculator tool for mathematical operations
 - Weather tool for providing weather information
 - Greeting tool for personalized greetings
@@ -91,6 +92,7 @@ To run this example, you need:
 If you want to customize the agent runtime:
 
 1. Modify the `app.py` file to implement your custom logic:
+
    - Add new tools by creating functions with the `@tool` decorator
    - Adjust the system prompt to reflect new capabilities
    - Modify the model parameters for different behavior
