@@ -1,5 +1,5 @@
 <!-- BEGIN_TF_DOCS -->
-# AgentCore Module
+# Bedrock AgentCore Module
 
 The [Amazon Bedrock AgentCore](https://aws.amazon.com/bedrock/agentcore/) Terraform module provides a high-level, object-oriented approach to creating and managing Amazon Bedrock AgentCore resources using Terraform. This module abstracts away the complexity of the L1 resources and provides a higher level implementation.
 
