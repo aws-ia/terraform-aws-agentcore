@@ -6,6 +6,7 @@ This example demonstrates how to create an AWS Bedrock AgentCore Gateway that ca
 ## Overview
 
 This example:
+
 1. Creates a simple Lambda function that will serve as a gateway target
 2. Sets up a Bedrock AgentCore Gateway with proper IAM permissions
 3. Configures the gateway to connect to the Lambda function
