@@ -12,6 +12,30 @@ locals {
   create_runtime = var.create_runtime
 }
 
+# IAM Policy for creating the Service-Linked Role
+data "aws_iam_policy_document" "service_linked_role" {
+  count = local.create_runtime ? 1 : 0
+  
+  statement {
+    sid    = "CreateBedrockAgentCoreIdentityServiceLinkedRolePermissions"
+    effect = "Allow"
+    actions = [
+      "iam:CreateServiceLinkedRole"
+    ]
+    resources = [
+      "arn:aws:iam::*:role/aws-service-role/runtime-identity.bedrock-agentcore.amazonaws.com/AWSServiceRoleForBedrockAgentCoreRuntimeIdentity"
+    ]
+    
+    condition {
+      test     = "StringEquals"
+      variable = "iam:AWSServiceName"
+      values   = [
+        "runtime-identity.bedrock-agentcore.amazonaws.com"
+      ]
+    }
+  }
+}
+
 resource "awscc_bedrockagentcore_runtime" "agent_runtime" {
   count              = local.create_runtime ? 1 : 0
   agent_runtime_name = "${random_string.solution_prefix.result}_${var.runtime_name}"
@@ -26,6 +50,10 @@ resource "awscc_bedrockagentcore_runtime" "agent_runtime" {
 
   network_configuration = {
     network_mode = var.runtime_network_mode
+    network_mode_config = var.runtime_network_mode == "VPC" ? {
+      security_groups = var.runtime_network_configuration.security_groups
+      subnets         = var.runtime_network_configuration.subnets
+    } : null
   }
 
   environment_variables = var.runtime_environment_variables
@@ -51,10 +79,19 @@ resource "aws_iam_role" "runtime_role" {
     Version = "2012-10-17"
     Statement = [
       {
+        Sid = "AssumeRolePolicy"
         Action = "sts:AssumeRole"
         Effect = "Allow"
         Principal = {
           Service = "bedrock-agentcore.amazonaws.com"
+        }
+        Condition = {
+          StringEquals = {
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+          }
+          ArnLike = {
+            "aws:SourceArn" = "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:*"
+          }
         }
       }
     ]
@@ -63,8 +100,15 @@ resource "aws_iam_role" "runtime_role" {
   permissions_boundary = var.permissions_boundary_arn
   tags                 = var.runtime_tags
 }
-
 # IAM Policy for Agent Runtime
+# Attach SLR policy to runtime role if created
+resource "aws_iam_role_policy" "runtime_slr_policy" {
+  count      = local.create_runtime && var.runtime_role_arn == null ? 1 : 0
+  name       = "${random_string.solution_prefix.result}-bedrock-agent-runtime-slr-policy"
+  role       = aws_iam_role.runtime_role[0].name
+  policy     = data.aws_iam_policy_document.service_linked_role[0].json
+}
+
 resource "aws_iam_role_policy" "runtime_role_policy" {
   count      = local.create_runtime && var.runtime_role_arn == null ? 1 : 0
   name       = "${random_string.solution_prefix.result}-bedrock-agent-runtime-policy"
