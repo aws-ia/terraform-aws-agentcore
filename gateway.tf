@@ -104,7 +104,7 @@ resource "aws_lambda_permission" "cross_account_lambda_permissions" {
   action        = "lambda:InvokeFunction"
   principal     = each.value.gateway_service_role_arn
   statement_id  = "LambdaAllowGatewayServiceRole-${each.key}"
-  source_arn    = try(awscc_bedrockagentcore_gateway.agent_gateway[0].arn, null)
+  source_arn    = try(awscc_bedrockagentcore_gateway.agent_gateway[0].gateway_arn, null)
 
   depends_on = [
     awscc_bedrockagentcore_gateway.agent_gateway

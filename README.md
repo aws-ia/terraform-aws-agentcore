@@ -113,6 +113,7 @@ module "agentcore" {
   create_gateway = true
   gateway_name = "MyMCPGateway"
   gateway_description = "Gateway for Model Context Protocol connections"
+
   # Configure the gateway protocol (MCP)
   gateway_protocol_type = "MCP"
   gateway_protocol_configuration = {
@@ -122,6 +123,7 @@ module "agentcore" {
       supported_versions = ["1.0.0"]
     }
   }
+
   # Optional JWT authorization
   gateway_authorizer_type = "CUSTOM_JWT"
   gateway_authorizer_configuration = {
@@ -130,8 +132,10 @@ module "agentcore" {
       allowed_audience = ["client-id-1", "client-id-2"]
     }
   }
+
   # Optional KMS encryption
   gateway_kms_key_arn = "<INSERT_KEY_HERE>"
+
   # Manage gateway permissions
   gateway_allow_create_permissions = true
   gateway_allow_update_delete_permissions = true
