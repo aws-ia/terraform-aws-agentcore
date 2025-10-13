@@ -131,7 +131,7 @@ module "agentcore" {
     }
   }
   # Optional KMS encryption
-  gateway_kms_key_arn = "arn:aws:kms:us-east-1:123456789012:key/1234abcd-12ab-34cd-56ef-1234567890ab"
+  gateway_kms_key_arn = "<INSERT_KEY_HERE>"
   # Manage gateway permissions
   gateway_allow_create_permissions = true
   gateway_allow_update_delete_permissions = true
