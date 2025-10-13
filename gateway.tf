@@ -26,6 +26,9 @@ locals {
   
   # Combine permissions
   gateway_manage_permissions = concat(local.gateway_create_permissions, local.gateway_update_delete_permissions)
+  
+  # Lambda function access
+  has_lambda_targets = length(var.gateway_lambda_function_arns) > 0
 }
 
 resource "awscc_bedrockagentcore_gateway" "agent_gateway" {
@@ -93,6 +96,21 @@ resource "aws_iam_role" "gateway_role" {
   tags                 = var.gateway_tags
 }
 
+# Resource-based policy for Lambda functions in other accounts
+resource "aws_lambda_permission" "cross_account_lambda_permissions" {
+  for_each = { for idx, perm in var.gateway_cross_account_lambda_permissions : idx => perm }
+
+  function_name = each.value.lambda_function_arn
+  action        = "lambda:InvokeFunction"
+  principal     = each.value.gateway_service_role_arn
+  statement_id  = "LambdaAllowGatewayServiceRole-${each.key}"
+  source_arn    = try(awscc_bedrockagentcore_gateway.agent_gateway[0].arn, null)
+
+  depends_on = [
+    awscc_bedrockagentcore_gateway.agent_gateway
+  ]
+}
+
 # IAM Policy for Agent Gateway
 resource "aws_iam_role_policy" "gateway_role_policy" {
   count      = local.create_gateway && var.gateway_role_arn == null ? 1 : 0
@@ -101,69 +119,7 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
   
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:DescribeLogStreams",
-          "logs:CreateLogGroup"
-        ]
-        Resource = [
-          "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/bedrock-agentcore/gateways/*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:DescribeLogGroups"
-        ]
-        Resource = [
-          "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ]
-        Resource = [
-          "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/bedrock-agentcore/gateways/*:log-stream:*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "xray:PutTraceSegments",
-          "xray:PutTelemetryRecords",
-          "xray:GetSamplingRules",
-          "xray:GetSamplingTargets"
-        ]
-        Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Resource = "*"
-        Action = "cloudwatch:PutMetricData"
-        Condition = {
-          StringEquals = {
-            "cloudwatch:namespace" = "bedrock-agentcore"
-          }
-        }
-      },
-      {
-        Sid = "GetGatewayAccessToken"
-        Effect = "Allow"
-        Action = [
-          "bedrock-agentcore:GetWorkloadAccessToken",
-          "bedrock-agentcore:GetWorkloadAccessTokenForJWT",
-          "bedrock-agentcore:GetWorkloadAccessTokenForUserId"
-        ]
-        Resource = [
-          "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
-          "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${random_string.solution_prefix.result}_${var.gateway_name}-*"
-        ]
-      },
+    Statement = concat([
       {
         Effect = "Allow"
         Action = [
@@ -188,6 +144,17 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
         Action = local.gateway_manage_permissions
         Resource = "*"
       } : null
-    ]
+    ],
+    # Lambda function invocation permissions
+    local.has_lambda_targets ? [
+      {
+        Sid = "AmazonBedrockAgentCoreGatewayLambdaProd"
+        Effect = "Allow"
+        Action = [
+          "lambda:InvokeFunction"
+        ]
+        Resource = var.gateway_lambda_function_arns
+      }
+    ] : [])
   })
 }

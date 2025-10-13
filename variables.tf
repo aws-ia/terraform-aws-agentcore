@@ -224,3 +224,19 @@ variable "permissions_boundary_arn" {
   type        = string
   default     = null
 }
+
+# - Lambda Function Access -
+variable "gateway_lambda_function_arns" {
+  description = "List of Lambda function ARNs that the gateway service role should be able to invoke. Required when using Lambda targets."
+  type        = list(string)
+  default     = []
+}
+
+variable "gateway_cross_account_lambda_permissions" {
+  description = "Configuration for cross-account Lambda function access. Required only if Lambda functions are in different AWS accounts."
+  type = list(object({
+    lambda_function_arn = string
+    gateway_service_role_arn = string
+  }))
+  default = []
+}
