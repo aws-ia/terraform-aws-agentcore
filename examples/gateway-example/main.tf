@@ -27,12 +27,23 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+# checkov:skip=CKV_AWS_272: Code signing validation not required for this example
+# checkov:skip=CKV_AWS_116: Dead Letter Queue not required for this example
+# checkov:skip=CKV_AWS_117: VPC configuration not required for this example
 resource "aws_lambda_function" "example_function" {
   filename      = "${path.module}/lambda_function.zip"
   function_name = "gateway_target_${random_id.suffix.hex}"
   role          = aws_iam_role.lambda_role.arn
   handler       = "index.handler"
   runtime       = "nodejs18.x"
+  
+  # Fix for CKV_AWS_115: Configure function-level concurrent execution limit
+  reserved_concurrent_executions = 10
+  
+  # Fix for CKV_AWS_50: Enable X-Ray tracing
+  tracing_config {
+    mode = "Active"
+  }
 
   # Create the zip file only when the Lambda function is created
   provisioner "local-exec" {
