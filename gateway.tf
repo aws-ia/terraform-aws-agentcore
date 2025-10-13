@@ -33,7 +33,7 @@ locals {
 
 resource "awscc_bedrockagentcore_gateway" "agent_gateway" {
   count              = local.create_gateway ? 1 : 0
-  name               = "${random_string.solution_prefix.result}_${var.gateway_name}"
+  name               = "${random_string.solution_prefix.result}-${var.gateway_name}"
   description        = var.gateway_description
   role_arn           = var.gateway_role_arn != null ? var.gateway_role_arn : aws_iam_role.gateway_role[0].arn
   
@@ -119,32 +119,27 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
   
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = concat([
-      {
+    Statement = concat(
+      # Only include KMS permission when gateway_kms_key_arn is not null
+      var.gateway_kms_key_arn != null ? [{
         Effect = "Allow"
         Action = [
           "kms:Decrypt"
         ]
-        Resource = var.gateway_kms_key_arn != null ? [var.gateway_kms_key_arn] : ["*"]
-        Condition = var.gateway_kms_key_arn == null ? {
-          StringEquals = {
-            "kms:ViaService" = "bedrock-agentcore.${data.aws_region.current.region}.amazonaws.com"
-          }
-        } : null
-      },
-      {
+        Resource = [var.gateway_kms_key_arn]
+      }] : [],
+      [{
         Sid = "GatewayReadPermissions"
         Effect = "Allow"
         Action = local.gateway_read_permissions
         Resource = "*"
-      },
-      length(local.gateway_manage_permissions) > 0 ? {
+      }],
+      length(local.gateway_manage_permissions) > 0 ? [{
         Sid = "GatewayManagePermissions"
         Effect = "Allow"
         Action = local.gateway_manage_permissions
         Resource = "*"
-      } : null
-    ],
+      }] : [],
     # Lambda function invocation permissions
     local.has_lambda_targets ? [
       {

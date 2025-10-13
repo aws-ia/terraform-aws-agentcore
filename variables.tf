@@ -42,11 +42,12 @@ variable "runtime_network_mode" {
 }
 
 variable "runtime_network_configuration" {
-  description = "value"
+  description = "VPC network configuration for the agent core runtime."
   type        = object({
     security_groups = optional(list(string))
     subnets         = optional(list(string))
   })
+  default = null
 }
 
 variable "runtime_environment_variables" {
@@ -138,13 +139,13 @@ variable "gateway_role_arn" {
 }
 
 variable "gateway_authorizer_type" {
-  description = "The authorizer type for the gateway. Valid values: NONE, CUSTOM_JWT."
+  description = "The authorizer type for the gateway. Valid values: AWS_IAM, CUSTOM_JWT."
   type        = string
-  default     = "NONE"
+  default     = "CUSTOM_JWT"
   
   validation {
-    condition     = contains(["NONE", "CUSTOM_JWT"], var.gateway_authorizer_type)
-    error_message = "The gateway_authorizer_type must be either NONE or CUSTOM_JWT."
+    condition     = contains(["AWS_IAM", "CUSTOM_JWT"], var.gateway_authorizer_type)
+    error_message = "The gateway_authorizer_type must be either AWS_IAM or CUSTOM_JWT."
   }
 }
 
@@ -215,7 +216,7 @@ variable "gateway_allow_create_permissions" {
 variable "gateway_allow_update_delete_permissions" {
   description = "Whether to allow update and delete permissions for the gateway."
   type        = bool
-  default     = true
+  default     = false
 }
 
 # - IAM -
