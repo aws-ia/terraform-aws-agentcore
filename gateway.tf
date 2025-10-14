@@ -28,12 +28,6 @@ locals {
 
   # Lambda function access
   has_lambda_targets = length(var.gateway_lambda_function_arns) > 0
-
-  # OAuth outbound authorization
-  enable_oauth = var.enable_oauth_outbound_auth
-  
-  # API Key outbound authorization
-  enable_apikey = var.enable_apikey_outbound_auth
 }
 
 resource "awscc_bedrockagentcore_gateway" "agent_gateway" {
