@@ -27,6 +27,8 @@ This module simplifies the process of:
 - **Protocol Configuration**: Configure MCP protocol settings for gateways
 - **Gateway Security**: Implement JWT authorization and KMS encryption for gateways
 - **Granular Permissions**: Control gateway create, read, update, and delete permissions
+- **OAuth2 Outbound Authorization**: Configure OAuth client for gateway outbound authorization
+- **API Key Outbound Authorization**: Configure API key for gateway outbound authorization
 
 ## Usage
 
@@ -141,6 +143,31 @@ module "agentcore" {
   gateway_allow_update_delete_permissions = true
 }
 ```
+
+### Automatic Cognito User Pool Creation
+
+The module can automatically create a Cognito User Pool to handle JWT authentication when no JWT auth information is provided:
+
+```hcl
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.1"
+
+  # Enable Agent Core Gateway
+  create_gateway = true
+  gateway_name = "GatewayWithAutoCognito"
+  gateway_authorizer_type = "CUSTOM_JWT"
+  # No gateway_authorizer_configuration - a Cognito User Pool will be created automatically
+
+}
+```
+
+In this scenario, the module will:
+
+1. Create a Cognito User Pool
+2. Configure a domain for the User Pool
+3. Set up a User Pool client with the necessary OAuth configuration
+4. Configure the gateway's JWT authorizer to use the User Pool
 
 ## Architecture
 
@@ -265,6 +292,10 @@ No modules.
 
 | Name | Type |
 |------|------|
+| [aws_cognito_user.admin](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cognito_user) | resource |
+| [aws_cognito_user_pool.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cognito_user_pool) | resource |
+| [aws_cognito_user_pool_client.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cognito_user_pool_client) | resource |
+| [aws_cognito_user_pool_domain.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cognito_user_pool_domain) | resource |
 | [aws_iam_role.gateway_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role.runtime_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role_policy.gateway_role_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
@@ -283,14 +314,18 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
+| <a name="input_apikey_credential_provider_arn"></a> [apikey\_credential\_provider\_arn](#input\_apikey\_credential\_provider\_arn) | ARN of the API key credential provider created with CreateApiKeyCredentialProvider. Required when enable\_apikey\_outbound\_auth is true. | `string` | `null` | no |
+| <a name="input_apikey_secret_arn"></a> [apikey\_secret\_arn](#input\_apikey\_secret\_arn) | ARN of the AWS Secrets Manager secret containing the API key. Required when enable\_apikey\_outbound\_auth is true. | `string` | `null` | no |
 | <a name="input_create_gateway"></a> [create\_gateway](#input\_create\_gateway) | Whether or not to create an agent core gateway. | `bool` | `false` | no |
 | <a name="input_create_runtime"></a> [create\_runtime](#input\_create\_runtime) | Whether or not to create an agent core runtime. | `bool` | `false` | no |
 | <a name="input_create_runtime_endpoint"></a> [create\_runtime\_endpoint](#input\_create\_runtime\_endpoint) | Whether or not to create an agent core runtime endpoint. | `bool` | `false` | no |
+| <a name="input_enable_apikey_outbound_auth"></a> [enable\_apikey\_outbound\_auth](#input\_enable\_apikey\_outbound\_auth) | Whether to enable outbound authorization with an API key for the gateway. | `bool` | `false` | no |
+| <a name="input_enable_oauth_outbound_auth"></a> [enable\_oauth\_outbound\_auth](#input\_enable\_oauth\_outbound\_auth) | Whether to enable outbound authorization with an OAuth client for the gateway. | `bool` | `false` | no |
 | <a name="input_gateway_allow_create_permissions"></a> [gateway\_allow\_create\_permissions](#input\_gateway\_allow\_create\_permissions) | Whether to allow create permissions for the gateway. | `bool` | `true` | no |
 | <a name="input_gateway_allow_update_delete_permissions"></a> [gateway\_allow\_update\_delete\_permissions](#input\_gateway\_allow\_update\_delete\_permissions) | Whether to allow update and delete permissions for the gateway. | `bool` | `false` | no |
 | <a name="input_gateway_authorizer_configuration"></a> [gateway\_authorizer\_configuration](#input\_gateway\_authorizer\_configuration) | Authorizer configuration for the agent core gateway. | <pre>object({<br>    custom_jwt_authorizer = object({<br>      allowed_audience = optional(list(string))<br>      allowed_clients  = optional(list(string))<br>      discovery_url    = string<br>    })<br>  })</pre> | `null` | no |
 | <a name="input_gateway_authorizer_type"></a> [gateway\_authorizer\_type](#input\_gateway\_authorizer\_type) | The authorizer type for the gateway. Valid values: AWS\_IAM, CUSTOM\_JWT. | `string` | `"CUSTOM_JWT"` | no |
-| <a name="input_gateway_cross_account_lambda_permissions"></a> [gateway\_cross\_account\_lambda\_permissions](#input\_gateway\_cross\_account\_lambda\_permissions) | Configuration for cross-account Lambda function access. Required only if Lambda functions are in different AWS accounts. | <pre>list(object({<br>    lambda_function_arn = string<br>    gateway_service_role_arn = string<br>  }))</pre> | `[]` | no |
+| <a name="input_gateway_cross_account_lambda_permissions"></a> [gateway\_cross\_account\_lambda\_permissions](#input\_gateway\_cross\_account\_lambda\_permissions) | Configuration for cross-account Lambda function access. Required only if Lambda functions are in different AWS accounts. | <pre>list(object({<br>    lambda_function_arn      = string<br>    gateway_service_role_arn = string<br>  }))</pre> | `[]` | no |
 | <a name="input_gateway_description"></a> [gateway\_description](#input\_gateway\_description) | Description of the agent core gateway. | `string` | `null` | no |
 | <a name="input_gateway_exception_level"></a> [gateway\_exception\_level](#input\_gateway\_exception\_level) | Exception level for the gateway. Valid values: PARTIAL, FULL. | `string` | `null` | no |
 | <a name="input_gateway_kms_key_arn"></a> [gateway\_kms\_key\_arn](#input\_gateway\_kms\_key\_arn) | The ARN of the KMS key used to encrypt the gateway. | `string` | `null` | no |
@@ -300,6 +335,8 @@ No modules.
 | <a name="input_gateway_protocol_type"></a> [gateway\_protocol\_type](#input\_gateway\_protocol\_type) | The protocol type for the gateway. Valid value: MCP. | `string` | `"MCP"` | no |
 | <a name="input_gateway_role_arn"></a> [gateway\_role\_arn](#input\_gateway\_role\_arn) | Optional external IAM role ARN for the Bedrock agent core gateway. If empty, the module will create one internally. | `string` | `null` | no |
 | <a name="input_gateway_tags"></a> [gateway\_tags](#input\_gateway\_tags) | A map of tag keys and values for the agent core gateway. | `map(string)` | `null` | no |
+| <a name="input_oauth_credential_provider_arn"></a> [oauth\_credential\_provider\_arn](#input\_oauth\_credential\_provider\_arn) | ARN of the OAuth credential provider created with CreateOauth2CredentialProvider. Required when enable\_oauth\_outbound\_auth is true. | `string` | `null` | no |
+| <a name="input_oauth_secret_arn"></a> [oauth\_secret\_arn](#input\_oauth\_secret\_arn) | ARN of the AWS Secrets Manager secret containing the OAuth client credentials. Required when enable\_oauth\_outbound\_auth is true. | `string` | `null` | no |
 | <a name="input_permissions_boundary_arn"></a> [permissions\_boundary\_arn](#input\_permissions\_boundary\_arn) | The ARN of the IAM permission boundary for the role. | `string` | `null` | no |
 | <a name="input_runtime_authorizer_configuration"></a> [runtime\_authorizer\_configuration](#input\_runtime\_authorizer\_configuration) | Authorizer configuration for the agent core runtime. | <pre>object({<br>    custom_jwt_authorizer = object({<br>      allowed_audience = optional(list(string))<br>      allowed_clients  = optional(list(string))<br>      discovery_url    = string<br>    })<br>  })</pre> | `null` | no |
 | <a name="input_runtime_container_uri"></a> [runtime\_container\_uri](#input\_runtime\_container\_uri) | The ECR URI of the container for the agent core runtime. | `string` | `null` | no |
@@ -315,6 +352,18 @@ No modules.
 | <a name="input_runtime_protocol_configuration"></a> [runtime\_protocol\_configuration](#input\_runtime\_protocol\_configuration) | Protocol configuration for the agent core runtime. | `string` | `null` | no |
 | <a name="input_runtime_role_arn"></a> [runtime\_role\_arn](#input\_runtime\_role\_arn) | Optional external IAM role ARN for the Bedrock agent core runtime. If empty, the module will create one internally. | `string` | `null` | no |
 | <a name="input_runtime_tags"></a> [runtime\_tags](#input\_runtime\_tags) | A map of tag keys and values for the agent core runtime. | `map(string)` | `null` | no |
+| <a name="input_user_pool_admin_email"></a> [user\_pool\_admin\_email](#input\_user\_pool\_admin\_email) | Email address for the admin user. | `string` | `"admin@example.com"` | no |
+| <a name="input_user_pool_admin_temp_password"></a> [user\_pool\_admin\_temp\_password](#input\_user\_pool\_admin\_temp\_password) | Temporary password for the admin user. | `string` | `"Temp1234!"` | no |
+| <a name="input_user_pool_allowed_clients"></a> [user\_pool\_allowed\_clients](#input\_user\_pool\_allowed\_clients) | List of allowed clients for the Cognito User Pool JWT authorizer. | `list(string)` | `[]` | no |
+| <a name="input_user_pool_callback_urls"></a> [user\_pool\_callback\_urls](#input\_user\_pool\_callback\_urls) | List of allowed callback URLs for the Cognito User Pool client. | `list(string)` | <pre>[<br>  "http://localhost:3000"<br>]</pre> | no |
+| <a name="input_user_pool_create_admin"></a> [user\_pool\_create\_admin](#input\_user\_pool\_create\_admin) | Whether to create an admin user in the Cognito User Pool. | `bool` | `false` | no |
+| <a name="input_user_pool_logout_urls"></a> [user\_pool\_logout\_urls](#input\_user\_pool\_logout\_urls) | List of allowed logout URLs for the Cognito User Pool client. | `list(string)` | <pre>[<br>  "http://localhost:3000"<br>]</pre> | no |
+| <a name="input_user_pool_mfa_configuration"></a> [user\_pool\_mfa\_configuration](#input\_user\_pool\_mfa\_configuration) | MFA configuration for the Cognito User Pool. Valid values: OFF, OPTIONAL, REQUIRED. | `string` | `"OFF"` | no |
+| <a name="input_user_pool_name"></a> [user\_pool\_name](#input\_user\_pool\_name) | The name of the Cognito User Pool to create when JWT auth info is not provided. | `string` | `"AgentCoreUserPool"` | no |
+| <a name="input_user_pool_password_policy"></a> [user\_pool\_password\_policy](#input\_user\_pool\_password\_policy) | Password policy for the Cognito User Pool. | <pre>object({<br>    minimum_length    = optional(number, 8)<br>    require_lowercase = optional(bool, true)<br>    require_numbers   = optional(bool, true)<br>    require_symbols   = optional(bool, true)<br>    require_uppercase = optional(bool, true)<br>  })</pre> | `{}` | no |
+| <a name="input_user_pool_refresh_token_validity_days"></a> [user\_pool\_refresh\_token\_validity\_days](#input\_user\_pool\_refresh\_token\_validity\_days) | Number of days that refresh tokens are valid for. | `number` | `30` | no |
+| <a name="input_user_pool_tags"></a> [user\_pool\_tags](#input\_user\_pool\_tags) | A map of tag keys and values for the Cognito User Pool. | `map(string)` | `null` | no |
+| <a name="input_user_pool_token_validity_hours"></a> [user\_pool\_token\_validity\_hours](#input\_user\_pool\_token\_validity\_hours) | Number of hours that ID and access tokens are valid for. | `number` | `24` | no |
 
 ## Outputs
 
@@ -336,8 +385,15 @@ No modules.
 | <a name="output_agent_runtime_status"></a> [agent\_runtime\_status](#output\_agent\_runtime\_status) | Status of the created Bedrock AgentCore Runtime |
 | <a name="output_agent_runtime_version"></a> [agent\_runtime\_version](#output\_agent\_runtime\_version) | Version of the created Bedrock AgentCore Runtime |
 | <a name="output_agent_runtime_workload_identity_details"></a> [agent\_runtime\_workload\_identity\_details](#output\_agent\_runtime\_workload\_identity\_details) | Workload identity details of the created Bedrock AgentCore Runtime |
+| <a name="output_cognito_discovery_url"></a> [cognito\_discovery\_url](#output\_cognito\_discovery\_url) | OpenID Connect discovery URL for the Cognito User Pool |
+| <a name="output_cognito_domain"></a> [cognito\_domain](#output\_cognito\_domain) | Domain of the Cognito User Pool |
 | <a name="output_gateway_role_arn"></a> [gateway\_role\_arn](#output\_gateway\_role\_arn) | ARN of the IAM role created for the Bedrock AgentCore Gateway |
 | <a name="output_gateway_role_name"></a> [gateway\_role\_name](#output\_gateway\_role\_name) | Name of the IAM role created for the Bedrock AgentCore Gateway |
 | <a name="output_runtime_role_arn"></a> [runtime\_role\_arn](#output\_runtime\_role\_arn) | ARN of the IAM role created for the Bedrock AgentCore Runtime |
 | <a name="output_runtime_role_name"></a> [runtime\_role\_name](#output\_runtime\_role\_name) | Name of the IAM role created for the Bedrock AgentCore Runtime |
+| <a name="output_user_pool_arn"></a> [user\_pool\_arn](#output\_user\_pool\_arn) | ARN of the Cognito User Pool created as JWT authentication fallback |
+| <a name="output_user_pool_client_id"></a> [user\_pool\_client\_id](#output\_user\_pool\_client\_id) | ID of the Cognito User Pool Client |
+| <a name="output_user_pool_endpoint"></a> [user\_pool\_endpoint](#output\_user\_pool\_endpoint) | Endpoint of the Cognito User Pool created as JWT authentication fallback |
+| <a name="output_user_pool_id"></a> [user\_pool\_id](#output\_user\_pool\_id) | ID of the Cognito User Pool created as JWT authentication fallback |
+| <a name="output_using_cognito_fallback"></a> [using\_cognito\_fallback](#output\_using\_cognito\_fallback) | Whether the module is using a Cognito User Pool as fallback for JWT authentication |
 <!-- END_TF_DOCS -->

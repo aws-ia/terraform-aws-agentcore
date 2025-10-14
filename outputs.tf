@@ -103,3 +103,40 @@ output "gateway_role_name" {
   description = "Name of the IAM role created for the Bedrock AgentCore Gateway"
   value       = try(aws_iam_role.gateway_role[0].name, null)
 }
+
+# – Cognito User Pool Outputs (for JWT Authentication Fallback) –
+
+output "user_pool_id" {
+  description = "ID of the Cognito User Pool created as JWT authentication fallback"
+  value       = try(aws_cognito_user_pool.default[0].id, null)
+}
+
+output "user_pool_arn" {
+  description = "ARN of the Cognito User Pool created as JWT authentication fallback"
+  value       = try(aws_cognito_user_pool.default[0].arn, null)
+}
+
+output "user_pool_endpoint" {
+  description = "Endpoint of the Cognito User Pool created as JWT authentication fallback"
+  value       = local.create_user_pool ? "https://${local.user_pool_domain_name}.auth.${data.aws_region.current.region}.amazoncognito.com" : null
+}
+
+output "user_pool_client_id" {
+  description = "ID of the Cognito User Pool Client"
+  value       = try(aws_cognito_user_pool_client.default[0].id, null)
+}
+
+output "cognito_domain" {
+  description = "Domain of the Cognito User Pool"
+  value       = try(aws_cognito_user_pool_domain.default[0].domain, null)
+}
+
+output "cognito_discovery_url" {
+  description = "OpenID Connect discovery URL for the Cognito User Pool"
+  value       = local.create_user_pool ? "https://${local.user_pool_domain_name}.auth.${data.aws_region.current.region}.amazoncognito.com/.well-known/openid-configuration" : null
+}
+
+output "using_cognito_fallback" {
+  description = "Whether the module is using a Cognito User Pool as fallback for JWT authentication"
+  value       = local.create_user_pool
+}
