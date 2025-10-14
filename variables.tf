@@ -353,13 +353,6 @@ variable "user_pool_admin_email" {
   default     = "admin@example.com"
 }
 
-variable "user_pool_admin_temp_password" {
-  description = "Temporary password for the admin user."
-  type        = string
-  default     = "Temp1234!"
-  sensitive   = true
-}
-
 variable "user_pool_tags" {
   description = "A map of tag keys and values for the Cognito User Pool."
   type        = map(string)

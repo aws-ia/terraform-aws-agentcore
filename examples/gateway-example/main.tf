@@ -36,7 +36,7 @@ resource "aws_lambda_function" "example_function" {
   function_name = "gateway_target_${random_id.suffix.hex}"
   role          = aws_iam_role.lambda_role.arn
   handler       = "index.handler"
-  runtime       = "nodejs18.x"
+  runtime       = "nodejs20.x"
   
   # Fix for CKV_AWS_115: Configure function-level concurrent execution limit
   reserved_concurrent_executions = 10

@@ -17,6 +17,12 @@ locals {
   } : var.gateway_authorizer_configuration
 }
 
+resource "random_password" "password" {
+  length           = 16
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
+}
+
 # Cognito User Pool
 resource "aws_cognito_user_pool" "default" {
   count = local.create_user_pool ? 1 : 0
@@ -127,5 +133,5 @@ resource "aws_cognito_user" "admin" {
     email_verified = "true"
   }
 
-  password = var.user_pool_admin_temp_password
+  password = random_password.password.result
 }
