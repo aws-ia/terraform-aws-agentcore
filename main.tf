@@ -6,6 +6,7 @@ resource "random_string" "solution_prefix" {
   length  = 4
   special = false
   upper   = false
+  numeric = false
 }
 
 locals {
