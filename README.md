@@ -37,7 +37,7 @@ This module simplifies the process of:
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.1"
+  version = "0.0.2"
 
   # Enable Agent Core Runtime
   create_runtime = true
@@ -62,7 +62,7 @@ module "agentcore" {
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.1"
+  version = "0.0.2"
 
   # Enable Agent Core Runtime
   create_runtime = true
@@ -88,7 +88,7 @@ module "agentcore" {
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.1"
+  version = "0.0.2"
 
   # Enable Agent Core Runtime with custom IAM role
   create_runtime = true
@@ -109,7 +109,7 @@ Create and configure an MCP gateway:
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.1"
+  version = "0.0.2"
 
   # Enable Agent Core Gateway
   create_gateway = true
@@ -151,7 +151,7 @@ The module can automatically create a Cognito User Pool to handle JWT authentica
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.1"
+  version = "0.0.2"
 
   # Enable Agent Core Gateway
   create_gateway = true
