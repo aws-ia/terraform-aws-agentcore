@@ -44,6 +44,15 @@ resource "awscc_bedrockagentcore_runtime" "agent_runtime" {
   agent_runtime_name = "${random_string.solution_prefix.result}_${local.sanitized_runtime_name}"
   description        = var.runtime_description
   role_arn           = var.runtime_role_arn != null ? var.runtime_role_arn : aws_iam_role.runtime_role[0].arn
+  
+  # Explicit dependency to avoid race conditions with IAM role creation
+  # Include the time_sleep resource to ensure IAM role propagation
+  depends_on = [
+    aws_iam_role.runtime_role,
+    aws_iam_role_policy.runtime_role_policy,
+    aws_iam_role_policy.runtime_slr_policy,
+    time_sleep.iam_role_propagation
+  ]
 
   agent_runtime_artifact = {
     container_configuration = {
@@ -110,6 +119,13 @@ resource "aws_iam_role_policy" "runtime_slr_policy" {
   name   = "${random_string.solution_prefix.result}-bedrock-agent-runtime-slr-policy"
   role   = aws_iam_role.runtime_role[0].name
   policy = data.aws_iam_policy_document.service_linked_role[0].json
+}
+
+# Add a time delay to ensure IAM role propagation
+resource "time_sleep" "iam_role_propagation" {
+  count           = local.create_runtime && var.runtime_role_arn == null ? 1 : 0
+  depends_on      = [aws_iam_role.runtime_role, aws_iam_role_policy.runtime_role_policy, aws_iam_role_policy.runtime_slr_policy]
+  create_duration = "20s"
 }
 
 resource "aws_iam_role_policy" "runtime_role_policy" {
