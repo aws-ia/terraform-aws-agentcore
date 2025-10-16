@@ -37,7 +37,7 @@ This module simplifies the process of:
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.1"
+  version = "0.0.2"
 
   # Enable Agent Core Runtime
   create_runtime = true
@@ -62,7 +62,7 @@ module "agentcore" {
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.1"
+  version = "0.0.2"
 
   # Enable Agent Core Runtime
   create_runtime = true
@@ -88,7 +88,7 @@ module "agentcore" {
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.1"
+  version = "0.0.2"
 
   # Enable Agent Core Runtime with custom IAM role
   create_runtime = true
@@ -109,7 +109,7 @@ Create and configure an MCP gateway:
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.1"
+  version = "0.0.2"
 
   # Enable Agent Core Gateway
   create_gateway = true
@@ -151,7 +151,7 @@ The module can automatically create a Cognito User Pool to handle JWT authentica
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.1"
+  version = "0.0.2"
 
   # Enable Agent Core Gateway
   create_gateway = true
@@ -275,6 +275,7 @@ gateway_tags = {
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 4.0.0 |
 | <a name="requirement_awscc"></a> [awscc](#requirement\_awscc) | >= 0.24.0 |
 | <a name="requirement_random"></a> [random](#requirement\_random) | >= 3.6.0 |
+| <a name="requirement_time"></a> [time](#requirement\_time) | >= 0.9.0 |
 
 ## Providers
 
@@ -283,6 +284,7 @@ gateway_tags = {
 | <a name="provider_aws"></a> [aws](#provider\_aws) | >= 4.0.0 |
 | <a name="provider_awscc"></a> [awscc](#provider\_awscc) | >= 0.24.0 |
 | <a name="provider_random"></a> [random](#provider\_random) | >= 3.6.0 |
+| <a name="provider_time"></a> [time](#provider\_time) | >= 0.9.0 |
 
 ## Modules
 
@@ -307,6 +309,7 @@ No modules.
 | [awscc_bedrockagentcore_runtime_endpoint.agent_runtime_endpoint](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_runtime_endpoint) | resource |
 | [random_password.password](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
 | [random_string.solution_prefix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
+| [time_sleep.iam_role_propagation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
 | [aws_iam_policy_document.service_linked_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_region.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/region) | data source |
