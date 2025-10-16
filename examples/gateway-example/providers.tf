@@ -1,3 +1,24 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 4.0.0"
+    }
+    awscc = {
+      source  = "hashicorp/awscc"
+      version = ">= 0.24.0"
+    }
+    archive = {
+      source  = "hashicorp/archive"
+      version = ">= 2.0.0"
+    }
+    local = {
+      source  = "hashicorp/local"
+      version = ">= 2.0.0"
+    }
+  }
+}
+
 provider "aws" {
   region = local.region
 }

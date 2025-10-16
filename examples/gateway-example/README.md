@@ -83,13 +83,20 @@ This example creates:
 
 ## Requirements
 
-No requirements.
+| Name | Version |
+|------|---------|
+| <a name="requirement_archive"></a> [archive](#requirement\_archive) | >= 2.0.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 4.0.0 |
+| <a name="requirement_awscc"></a> [awscc](#requirement\_awscc) | >= 0.24.0 |
+| <a name="requirement_local"></a> [local](#requirement\_local) | >= 2.0.0 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| <a name="provider_aws"></a> [aws](#provider\_aws) | n/a |
+| <a name="provider_archive"></a> [archive](#provider\_archive) | >= 2.0.0 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | >= 4.0.0 |
+| <a name="provider_local"></a> [local](#provider\_local) | >= 2.0.0 |
 | <a name="provider_random"></a> [random](#provider\_random) | n/a |
 
 ## Modules
@@ -102,9 +109,11 @@ No requirements.
 
 | Name | Type |
 |------|------|
+| [archive_file.lambda_zip](https://registry.terraform.io/providers/hashicorp/archive/latest/docs/resources/file) | resource |
 | [aws_iam_role.lambda_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role_policy_attachment.lambda_basic](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
 | [aws_lambda_function.example_function](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_function) | resource |
+| [local_file.lambda_code](https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/file) | resource |
 | [random_id.suffix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/id) | resource |
 
 ## Inputs

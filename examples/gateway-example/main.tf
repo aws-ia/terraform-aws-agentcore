@@ -5,6 +5,26 @@
 #####################################################################################
 
 # Create a simple Lambda function to be used as a gateway target
+# First, create the Lambda ZIP file using the archive_file resource
+resource "local_file" "lambda_code" {
+  filename = "${path.module}/index.js"
+  content  = <<-EOT
+    exports.handler = async (event) => {
+      console.log("Event:", JSON.stringify(event, null, 2));
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ message: "Hello from Lambda!" }),
+      };
+    };
+  EOT
+}
+
+resource "archive_file" "lambda_zip" {
+  type        = "zip"
+  source_file = local_file.lambda_code.filename
+  output_path = "${path.module}/lambda_function.zip"
+}
+
 resource "aws_iam_role" "lambda_role" {
   name = "example_lambda_role_${random_id.suffix.hex}"
 
@@ -32,7 +52,7 @@ resource "aws_lambda_function" "example_function" {
   #checkov:skip=CKV_AWS_272: Code signing validation not required for this example
   #checkov:skip=CKV_AWS_116: Dead Letter Queue not required for this example
   #checkov:skip=CKV_AWS_117: VPC configuration not required for this example
-  filename      = "${path.module}/lambda_function.zip"
+  filename      = archive_file.lambda_zip.output_path
   function_name = "gateway_target_${random_id.suffix.hex}"
   role          = aws_iam_role.lambda_role.arn
   handler       = "index.handler"
@@ -45,21 +65,8 @@ resource "aws_lambda_function" "example_function" {
   tracing_config {
     mode = "Active"
   }
-
-  # Create the zip file only when the Lambda function is created
-  provisioner "local-exec" {
-    command = <<EOF
-      cd ${path.module} && \
-      echo 'exports.handler = async (event) => {
-        console.log("Event:", JSON.stringify(event, null, 2));
-        return {
-          statusCode: 200,
-          body: JSON.stringify({ message: "Hello from Lambda!" }),
-        };
-      };' > index.js && \
-      zip lambda_function.zip index.js
-    EOF
-  }
+  
+  source_code_hash = archive_file.lambda_zip.output_base64sha256
 }
 
 # Use the AgentCore module with gateway configuration
