@@ -5,14 +5,15 @@ The [Amazon Bedrock AgentCore](https://aws.amazon.com/bedrock/agentcore/) Terraf
 
 ## Overview
 
-The module provides support for Amazon Bedrock AgentCore Runtime, Runtime Endpoints, and Gateways. This allows you to deploy custom container-based runtimes for your Bedrock agents and create gateways, which serve as integration points between agents and external services.
+The module provides support for Amazon Bedrock AgentCore Runtime, Runtime Endpoints, Memories, and Gateways. This allows you to deploy custom container-based runtimes for your Bedrock agents, create memory resources that provide long-term contextual awareness, and establish gateways which serve as integration points between agents and external services.
 
 This module simplifies the process of:
 
 - Creating and configuring Bedrock AgentCore Runtimes
 - Setting up AgentCore Runtime Endpoints
+- Implementing AgentCore Memory with various memory strategies
 - Creating and managing AgentCore Gateways
-- Managing IAM permissions for your runtimes and gateways
+- Managing IAM permissions for your runtimes, memories, and gateways
 - Configuring network access and security settings
 
 ## Features
@@ -23,6 +24,10 @@ This module simplifies the process of:
 - **Environment Variables**: Pass configuration to your runtime container
 - **JWT Authorization**: Optional JWT authorizer configuration for secure access
 - **Endpoint Management**: Create and manage runtime endpoints for client access
+- **Memory Management**: Create and configure memory resources for persistent contextual awareness
+- **Multiple Memory Strategies**: Support for semantic, summary, user preference, and custom memory strategies
+- **Namespace Organization**: Organize memory data with customizable namespaces for different actors and sessions
+- **Custom Memory Consolidation**: Override prompts and models for memory extraction and consolidation
 - **Gateway Support**: Create and manage AgentCore Gateways for model context communication
 - **Protocol Configuration**: Configure MCP protocol settings for gateways
 - **Gateway Security**: Implement JWT authorization and KMS encryption for gateways
@@ -144,7 +149,7 @@ module "agentcore" {
 }
 ```
 
-### Automatic Cognito User Pool Creation
+#### Automatic Cognito User Pool Creation
 
 The module can automatically create a Cognito User Pool to handle JWT authentication when no JWT auth information is provided:
 
@@ -168,6 +173,252 @@ In this scenario, the module will:
 2. Configure a domain for the User Pool
 3. Set up a User Pool client with the necessary OAuth configuration
 4. Configure the gateway's JWT authorizer to use the User Pool
+
+### AgentCore Memory
+
+Memory is a critical component of intelligence. While Large Language Models (LLMs) have impressive capabilities, they lack persistent memory across conversations. Amazon Bedrock AgentCore Memory addresses this limitation by providing a managed service that enables AI agents to maintain context over time, remember important facts, and deliver consistent, personalized experiences.
+
+AgentCore Memory operates on two levels:
+
+- **Short-Term Memory**: Immediate conversation context and session-based information that provides continuity within a single interaction or closely related sessions.
+- **Long-Term Memory**: Persistent information extracted and stored across multiple conversations, including facts, preferences, and summaries that enable personalized experiences over time.
+
+When you interact with the memory, you store interactions in Short-Term Memory (STM) instantly. These interactions can include everything from user messages, assistant responses, to tool actions.
+
+To write to long-term memory, you need to configure extraction strategies which define how and where to store information from conversations for future use. These strategies are asynchronously processed from raw events after every few turns based on the strategy that was selected. You can't create long term memory records directly, as they are extracted asynchronously by AgentCore Memory.
+
+#### Basic Memory Creation
+
+Below you can find how to configure a simple short-term memory (STM) with no long-term memory extraction strategies. Note how you set `memory_event_expiry_duration`, which defines the time in days the events will be stored in the short-term memory before they expire.
+
+```hcl
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.2"
+
+  # Create a basic memory with default settings, no LTM strategies
+  create_memory = true
+  memory_name = "my_memory"
+  memory_description = "A memory for storing user interactions for a period of 90 days"
+  memory_event_expiry_duration = 90
+}
+```
+
+Basic Memory with Custom KMS Encryption
+
+```hcl
+# Create a custom KMS key for encryption
+resource "aws_kms_key" "memory_encryption_key" {
+  enable_key_rotation = true
+  description         = "KMS key for memory encryption"
+}
+
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.2"
+
+  # Create memory with custom encryption
+  create_memory = true
+  memory_name = "my_encrypted_memory"
+  memory_description = "Memory with custom KMS encryption"
+  memory_event_expiry_duration = 90
+  memory_kms_key_arn = aws_kms_key.memory_encryption_key.arn
+}
+```
+
+#### Memory with Built-in Strategies
+
+The library provides three built-in LTM strategies. These are default strategies for organizing and extracting memory data, each optimized for specific use cases.
+
+For example: An agent helps multiple users with cloud storage setup. From these conversations, see how each strategy processes users expressing confusion about account connection:
+
+1. **Summarization Strategy**
+This strategy compresses conversations into concise overviews, preserving essential context and key insights for quick recall. Extracted memory example: Users confused by cloud setup during onboarding.
+
+   - Extracts concise summaries to preserve critical context and key insights
+   - Namespace: `/strategies/{memoryStrategyId}/actors/{actorId}/sessions/{sessionId}`
+
+2. **Semantic Memory Strategy**
+Distills general facts, concepts, and underlying meanings from raw conversational data, presenting the information in a context-independent format. Extracted memory example: In-context learning = task-solving via examples, no training needed.
+
+   - Extracts general factual knowledge, concepts and meanings from raw conversations
+   - Namespace: `/strategies/{memoryStrategyId}/actors/{actorId}`
+
+3. **User Preference Strategy**
+Captures individual preferences, interaction patterns, and personalized settings to enhance future experiences. Extracted memory example: User needs clear guidance on cloud storage account connection during onboarding.
+
+   - Extracts user behavior patterns from raw conversations
+   - Namespace: `/strategies/{memoryStrategyId}/actors/{actorId}`
+
+```hcl
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.2"
+
+  # Create memory with built-in strategies
+  create_memory = true
+  memory_name = "my_memory"
+  memory_description = "Memory with built-in strategies"
+  memory_event_expiry_duration = 90
+
+  # Add built-in memory strategies
+  memory_strategies = [
+    {
+      summarization_memory_strategy = {
+        name = "summary_strategy"
+        description = "Built-in summarization memory strategy"
+        namespaces = ["/strategies/{memoryStrategyId}/actors/{actorId}/sessions/{sessionId}"]
+      }
+    },
+    {
+      semantic_memory_strategy = {
+        name = "semantic_strategy"
+        description = "Built-in semantic memory strategy"
+        namespaces = ["/strategies/{memoryStrategyId}/actors/{actorId}"]
+      }
+    },
+    {
+      user_preference_memory_strategy = {
+        name = "preference_strategy"
+        description = "Built-in user preference memory strategy"
+        namespaces = ["/strategies/{memoryStrategyId}/actors/{actorId}"]
+      }
+    }
+  ]
+}
+```
+
+The name generated for each built in memory strategy follows this pattern:
+
+- For Summarization: `summary_builtin_<suffix>`
+- For Semantic: `semantic_builtin_<suffix>`
+- For User Preferences: `preference_builtin_<suffix>`
+
+Where the suffix is a 5 characters string ([a-z, A-Z, 0-9]).
+
+#### LTM Memory Extraction Stategies
+
+If you need long-term memory for context recall across sessions, you can setup memory extraction strategies to extract the relevant memory from the raw events.
+
+Amazon Bedrock AgentCore Memory has different memory strategies for extracting and organizing information:
+
+- **Summarization**: to summarize interactions to preserve critical context and key insights.
+- **Semantic Memory**: to extract general factual knowledge, concepts and meanings from raw conversations using vector embeddings. This enables similarity-based retrieval of relevant facts and context.
+- **User Preferences**: to extract user behavior patterns from raw conversations.
+
+You can use built-in extraction strategies for quick setup, or create custom extraction strategies with specific models and prompt templates.
+
+#### Memory with Built-in Strategies - Custom Namespace
+
+With Long-Term Memory, organization is managed through Namespaces.
+
+An `actor` refers to entity such as end users or agent/user combinations. For example, in a coding support chatbot, the actor is usually the developer asking questions. Using the actor ID helps the system know which user the memory belongs to, keeping each user's data separate and organized.
+
+A `session` is usually a single conversation or interaction period between the user and the AI agent. It groups all related messages and events that happen during that conversation.
+
+A `namespace` is used to logically group and organize long-term memories. It ensures data stays neat, separate, and secure.
+
+With AgentCore Memory, you need to add a namespace when you define a memory strategy. This namespace helps define where the long-term memory will be logically grouped. Every time a new long-term memory is extracted using this memory strategy, it is saved under the namespace you set. This means that all long-term memories are scoped to their specific namespace, keeping them organized and preventing any mix-ups with other users or sessions. You should use a hierarchical format separated by forward slashes /. This helps keep memories organized clearly. As needed, you can choose to use the below pre-defined variables within braces in the namespace based on your applications' organization needs:
+
+- `actorId` – Identifies who the long-term memory belongs to, such as a user
+- `memoryStrategyId` – Shows which memory strategy is being used. This strategy identifier is auto-generated when you create a memory using CreateMemory operation.
+- `sessionId` – Identifies which session or conversation the memory is from.
+
+For example, if you define the following namespace as the input to your strategy:
+
+```shell
+/strategy/{memoryStrategyId}/actor/{actorId}/session/{sessionId}
+```
+
+After memory creation, this namespace might look like:
+
+```shell
+/strategy/summarization-93483043//actor/actor-9830m2w3/session/session-9330sds8
+```
+
+You can customize the namespace (where the memories are stored) by configuring the memory strategies in your Terraform configuration:
+
+```hcl
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.2"
+
+  # Enable Agent Core Memory
+  create_memory = true
+  memory_name = "my_memory"
+  memory_description = "Memory with built-in strategies"
+  memory_event_expiry_duration = 90
+
+  # Configure memory strategies with custom namespaces
+  memory_strategies = [
+    {
+      user_preference_memory_strategy = {
+        name = "CustomerPreferences"
+        description = "User preference memory strategy"
+        namespaces = ["support/customer/{actorId}/preferences"]
+      }
+    },
+    {
+      semantic_memory_strategy = {
+        name = "CustomerSupportSemantic"
+        description = "Semantic memory strategy"
+        namespaces = ["support/customer/{actorId}/semantic"]
+      }
+    }
+  ]
+}
+```
+
+#### Custom Strategies (Built-in strategy with override)
+
+Custom memory strategies let you tailor memory extraction and consolidation to your specific domain or use case. You can override the prompts for extracting and consolidating semantic, summary, or user preferences. You can also choose the model that you want to use for extraction and consolidation.
+
+The custom prompts you create are appended to a non-editable system prompt.
+
+Since a custom strategy requires you to invoke certain Foundation Models, you need a role with appropriate permissions. For that, you can:
+
+- Use a custom role with the overly permissive `AmazonBedrockAgentCoreMemoryBedrockModelInferenceExecutionRolePolicy` managed policy.
+- Use a custom role with your own custom policies.
+
+#### Memory with Custom Execution Role
+
+Keep in mind that memories that **do not** use custom strategies do not require a service role. A role is only created automatically when you use custom memory strategies that need to invoke foundation models. For standard built-in strategies (semantic, summary, user preference), no role is needed.
+
+#### Policy Documents for Other Resources
+
+The module also exposes IAM policy documents that you can use to grant memory permissions to other resources (like Lambda functions or EC2 instances):
+
+```hcl
+# Create a Lambda function that needs to write to memory
+resource "aws_lambda_function" "memory_writer" {
+  function_name = "memory-writer"
+  # ... other Lambda configuration ...
+}
+
+# Create a policy for the Lambda using the provided policy document
+resource "aws_iam_policy" "memory_write_policy" {
+  name   = "memory-write-policy"
+  policy = jsonencode(module.agentcore.memory_stm_write_policy)
+}
+
+# Attach the policy to the Lambda role
+resource "aws_iam_role_policy_attachment" "memory_write_policy_attachment" {
+  role       = aws_lambda_function.memory_writer.role
+  policy_arn = aws_iam_policy.memory_write_policy.arn
+}
+```
+
+Available policy documents include:
+
+- `memory_stm_write_policy` - For STM write permissions
+- `memory_read_policy` - For read permissions to both STM and LTM
+- `memory_stm_read_policy` - For STM-only read permissions
+- `memory_ltm_read_policy` - For LTM-only read permissions
+- `memory_delete_policy` - For delete permissions to both STM and LTM
+- `memory_stm_delete_policy` - For STM-only delete permissions
+- `memory_ltm_delete_policy` - For LTM-only delete permissions
+- `memory_admin_policy` - For control plane admin permissions
+- `memory_full_access_policy` - For full access to all operations
 
 ## Architecture
 
@@ -260,6 +511,12 @@ runtime_endpoint_tags = {
   Owner       = "data-science-team"
 }
 
+memory_tags = {
+  Environment = "production"
+  Project     = "ai-assistants"
+  Owner       = "data-science-team"
+}
+
 gateway_tags = {
   Environment = "production"
   Project     = "ai-assistants"
@@ -299,18 +556,23 @@ No modules.
 | [aws_cognito_user_pool_client.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cognito_user_pool_client) | resource |
 | [aws_cognito_user_pool_domain.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cognito_user_pool_domain) | resource |
 | [aws_iam_role.gateway_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
+| [aws_iam_role.memory_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role.runtime_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role_policy.gateway_role_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [aws_iam_role_policy.runtime_role_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [aws_iam_role_policy.runtime_slr_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
+| [aws_iam_role_policy_attachment.memory_execution_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
 | [aws_lambda_permission.cross_account_lambda_permissions](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_permission) | resource |
 | [awscc_bedrockagentcore_gateway.agent_gateway](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_gateway) | resource |
+| [awscc_bedrockagentcore_memory.agent_memory](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_memory) | resource |
 | [awscc_bedrockagentcore_runtime.agent_runtime](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_runtime) | resource |
 | [awscc_bedrockagentcore_runtime_endpoint.agent_runtime_endpoint](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_runtime_endpoint) | resource |
 | [random_password.password](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
 | [random_string.solution_prefix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
 | [time_sleep.iam_role_propagation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
+| [time_sleep.memory_iam_role_propagation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
+| [aws_iam_policy.bedrock_memory_inference_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy) | data source |
 | [aws_iam_policy_document.service_linked_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_region.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/region) | data source |
 
@@ -321,6 +583,7 @@ No modules.
 | <a name="input_apikey_credential_provider_arn"></a> [apikey\_credential\_provider\_arn](#input\_apikey\_credential\_provider\_arn) | ARN of the API key credential provider created with CreateApiKeyCredentialProvider. Required when enable\_apikey\_outbound\_auth is true. | `string` | `null` | no |
 | <a name="input_apikey_secret_arn"></a> [apikey\_secret\_arn](#input\_apikey\_secret\_arn) | ARN of the AWS Secrets Manager secret containing the API key. Required when enable\_apikey\_outbound\_auth is true. | `string` | `null` | no |
 | <a name="input_create_gateway"></a> [create\_gateway](#input\_create\_gateway) | Whether or not to create an agent core gateway. | `bool` | `false` | no |
+| <a name="input_create_memory"></a> [create\_memory](#input\_create\_memory) | Whether or not to create an agent core memory. | `bool` | `false` | no |
 | <a name="input_create_runtime"></a> [create\_runtime](#input\_create\_runtime) | Whether or not to create an agent core runtime. | `bool` | `false` | no |
 | <a name="input_create_runtime_endpoint"></a> [create\_runtime\_endpoint](#input\_create\_runtime\_endpoint) | Whether or not to create an agent core runtime endpoint. | `bool` | `false` | no |
 | <a name="input_enable_apikey_outbound_auth"></a> [enable\_apikey\_outbound\_auth](#input\_enable\_apikey\_outbound\_auth) | Whether to enable outbound authorization with an API key for the gateway. | `bool` | `false` | no |
@@ -339,6 +602,13 @@ No modules.
 | <a name="input_gateway_protocol_type"></a> [gateway\_protocol\_type](#input\_gateway\_protocol\_type) | The protocol type for the gateway. Valid value: MCP. | `string` | `"MCP"` | no |
 | <a name="input_gateway_role_arn"></a> [gateway\_role\_arn](#input\_gateway\_role\_arn) | Optional external IAM role ARN for the Bedrock agent core gateway. If empty, the module will create one internally. | `string` | `null` | no |
 | <a name="input_gateway_tags"></a> [gateway\_tags](#input\_gateway\_tags) | A map of tag keys and values for the agent core gateway. | `map(string)` | `null` | no |
+| <a name="input_memory_description"></a> [memory\_description](#input\_memory\_description) | Description of the agent core memory. | `string` | `null` | no |
+| <a name="input_memory_encryption_key_arn"></a> [memory\_encryption\_key\_arn](#input\_memory\_encryption\_key\_arn) | The ARN of the KMS key used to encrypt the memory. | `string` | `null` | no |
+| <a name="input_memory_event_expiry_duration"></a> [memory\_event\_expiry\_duration](#input\_memory\_event\_expiry\_duration) | Duration in days until memory events expire. | `number` | `90` | no |
+| <a name="input_memory_execution_role_arn"></a> [memory\_execution\_role\_arn](#input\_memory\_execution\_role\_arn) | Optional IAM role ARN for the Bedrock agent core memory. | `string` | `null` | no |
+| <a name="input_memory_name"></a> [memory\_name](#input\_memory\_name) | The name of the agent core memory. | `string` | `"TerraformBedrockAgentCoreMemory"` | no |
+| <a name="input_memory_strategies"></a> [memory\_strategies](#input\_memory\_strategies) | List of memory strategies attached to this memory. | <pre>list(object({<br>    semantic_memory_strategy = optional(object({<br>      name = optional(string)<br>      description = optional(string)<br>      namespaces = optional(list(string))<br>    }))<br>    summary_memory_strategy = optional(object({<br>      name = optional(string)<br>      description = optional(string)<br>      namespaces = optional(list(string))<br>    }))<br>    user_preference_memory_strategy = optional(object({<br>      name = optional(string)<br>      description = optional(string)<br>      namespaces = optional(list(string))<br>    }))<br>    custom_memory_strategy = optional(object({<br>      name = optional(string)<br>      description = optional(string)<br>      namespaces = optional(list(string))<br>      configuration = optional(object({<br>        self_managed_configuration = optional(object({<br>          historical_context_window_size = optional(number)<br>          invocation_configuration = optional(object({<br>            payload_delivery_bucket_name = optional(string)<br>            topic_arn = optional(string)<br>          }))<br>          trigger_conditions = optional(list(object({<br>            message_based_trigger = optional(object({<br>              message_count = optional(number)<br>            }))<br>            time_based_trigger = optional(object({<br>              idle_session_timeout = optional(number)<br>            }))<br>            token_based_trigger = optional(object({<br>              token_count = optional(number)<br>            }))<br>          })))<br>        }))<br>        semantic_override = optional(object({<br>          consolidation = optional(object({<br>            append_to_prompt = optional(string)<br>            model_id = optional(string)<br>          }))<br>          extraction = optional(object({<br>            append_to_prompt = optional(string)<br>            model_id = optional(string)<br>          }))<br>        }))<br>        summary_override = optional(object({<br>          consolidation = optional(object({<br>            append_to_prompt = optional(string)<br>            model_id = optional(string)<br>          }))<br>        }))<br>        user_preference_override = optional(object({<br>          consolidation = optional(object({<br>            append_to_prompt = optional(string)<br>            model_id = optional(string)<br>          }))<br>          extraction = optional(object({<br>            append_to_prompt = optional(string)<br>            model_id = optional(string)<br>          }))<br>        }))<br>      }))<br>    }))<br>  }))</pre> | `[]` | no |
+| <a name="input_memory_tags"></a> [memory\_tags](#input\_memory\_tags) | A map of tag keys and values for the agent core memory. | `map(string)` | `null` | no |
 | <a name="input_oauth_credential_provider_arn"></a> [oauth\_credential\_provider\_arn](#input\_oauth\_credential\_provider\_arn) | ARN of the OAuth credential provider created with CreateOauth2CredentialProvider. Required when enable\_oauth\_outbound\_auth is true. | `string` | `null` | no |
 | <a name="input_oauth_secret_arn"></a> [oauth\_secret\_arn](#input\_oauth\_secret\_arn) | ARN of the AWS Secrets Manager secret containing the OAuth client credentials. Required when enable\_oauth\_outbound\_auth is true. | `string` | `null` | no |
 | <a name="input_permissions_boundary_arn"></a> [permissions\_boundary\_arn](#input\_permissions\_boundary\_arn) | The ARN of the IAM permission boundary for the role. | `string` | `null` | no |
@@ -378,6 +648,11 @@ No modules.
 | <a name="output_agent_gateway_status_reasons"></a> [agent\_gateway\_status\_reasons](#output\_agent\_gateway\_status\_reasons) | Status reasons of the created Bedrock AgentCore Gateway |
 | <a name="output_agent_gateway_url"></a> [agent\_gateway\_url](#output\_agent\_gateway\_url) | URL of the created Bedrock AgentCore Gateway |
 | <a name="output_agent_gateway_workload_identity_details"></a> [agent\_gateway\_workload\_identity\_details](#output\_agent\_gateway\_workload\_identity\_details) | Workload identity details of the created Bedrock AgentCore Gateway |
+| <a name="output_agent_memory_arn"></a> [agent\_memory\_arn](#output\_agent\_memory\_arn) | ARN of the created Bedrock AgentCore Memory |
+| <a name="output_agent_memory_created_at"></a> [agent\_memory\_created\_at](#output\_agent\_memory\_created\_at) | Creation timestamp of the created Bedrock AgentCore Memory |
+| <a name="output_agent_memory_id"></a> [agent\_memory\_id](#output\_agent\_memory\_id) | ID of the created Bedrock AgentCore Memory |
+| <a name="output_agent_memory_status"></a> [agent\_memory\_status](#output\_agent\_memory\_status) | Status of the created Bedrock AgentCore Memory |
+| <a name="output_agent_memory_updated_at"></a> [agent\_memory\_updated\_at](#output\_agent\_memory\_updated\_at) | Last update timestamp of the created Bedrock AgentCore Memory |
 | <a name="output_agent_runtime_arn"></a> [agent\_runtime\_arn](#output\_agent\_runtime\_arn) | ARN of the created Bedrock AgentCore Runtime |
 | <a name="output_agent_runtime_endpoint_arn"></a> [agent\_runtime\_endpoint\_arn](#output\_agent\_runtime\_endpoint\_arn) | ARN of the created Bedrock AgentCore Runtime Endpoint |
 | <a name="output_agent_runtime_endpoint_id"></a> [agent\_runtime\_endpoint\_id](#output\_agent\_runtime\_endpoint\_id) | ID of the created Bedrock AgentCore Runtime Endpoint |
@@ -392,6 +667,26 @@ No modules.
 | <a name="output_cognito_domain"></a> [cognito\_domain](#output\_cognito\_domain) | Domain of the Cognito User Pool |
 | <a name="output_gateway_role_arn"></a> [gateway\_role\_arn](#output\_gateway\_role\_arn) | ARN of the IAM role created for the Bedrock AgentCore Gateway |
 | <a name="output_gateway_role_name"></a> [gateway\_role\_name](#output\_gateway\_role\_name) | Name of the IAM role created for the Bedrock AgentCore Gateway |
+| <a name="output_memory_admin_permissions"></a> [memory\_admin\_permissions](#output\_memory\_admin\_permissions) | IAM permissions for memory administration operations |
+| <a name="output_memory_admin_policy"></a> [memory\_admin\_policy](#output\_memory\_admin\_policy) | Policy document for granting control plane admin permissions |
+| <a name="output_memory_delete_permissions"></a> [memory\_delete\_permissions](#output\_memory\_delete\_permissions) | Combined IAM permissions for deleting from both Short-Term Memory (STM) and Long-Term Memory (LTM) |
+| <a name="output_memory_delete_policy"></a> [memory\_delete\_policy](#output\_memory\_delete\_policy) | Policy document for granting delete permissions to both STM and LTM |
+| <a name="output_memory_full_access_permissions"></a> [memory\_full\_access\_permissions](#output\_memory\_full\_access\_permissions) | Full access IAM permissions for all memory operations |
+| <a name="output_memory_full_access_policy"></a> [memory\_full\_access\_policy](#output\_memory\_full\_access\_policy) | Policy document for granting full access to all memory operations |
+| <a name="output_memory_ltm_delete_permissions"></a> [memory\_ltm\_delete\_permissions](#output\_memory\_ltm\_delete\_permissions) | IAM permissions for deleting from Long-Term Memory (LTM) |
+| <a name="output_memory_ltm_delete_policy"></a> [memory\_ltm\_delete\_policy](#output\_memory\_ltm\_delete\_policy) | Policy document for granting LTM delete permissions only |
+| <a name="output_memory_ltm_read_permissions"></a> [memory\_ltm\_read\_permissions](#output\_memory\_ltm\_read\_permissions) | IAM permissions for reading from Long-Term Memory (LTM) |
+| <a name="output_memory_ltm_read_policy"></a> [memory\_ltm\_read\_policy](#output\_memory\_ltm\_read\_policy) | Policy document for granting LTM read permissions only |
+| <a name="output_memory_read_permissions"></a> [memory\_read\_permissions](#output\_memory\_read\_permissions) | Combined IAM permissions for reading from both Short-Term Memory (STM) and Long-Term Memory (LTM) |
+| <a name="output_memory_read_policy"></a> [memory\_read\_policy](#output\_memory\_read\_policy) | Policy document for granting read permissions to both STM and LTM |
+| <a name="output_memory_role_arn"></a> [memory\_role\_arn](#output\_memory\_role\_arn) | ARN of the IAM role created for the Bedrock AgentCore Memory |
+| <a name="output_memory_role_name"></a> [memory\_role\_name](#output\_memory\_role\_name) | Name of the IAM role created for the Bedrock AgentCore Memory |
+| <a name="output_memory_stm_delete_permissions"></a> [memory\_stm\_delete\_permissions](#output\_memory\_stm\_delete\_permissions) | IAM permissions for deleting from Short-Term Memory (STM) |
+| <a name="output_memory_stm_delete_policy"></a> [memory\_stm\_delete\_policy](#output\_memory\_stm\_delete\_policy) | Policy document for granting STM delete permissions only |
+| <a name="output_memory_stm_read_permissions"></a> [memory\_stm\_read\_permissions](#output\_memory\_stm\_read\_permissions) | IAM permissions for reading from Short-Term Memory (STM) |
+| <a name="output_memory_stm_read_policy"></a> [memory\_stm\_read\_policy](#output\_memory\_stm\_read\_policy) | Policy document for granting STM read permissions only |
+| <a name="output_memory_stm_write_permissions"></a> [memory\_stm\_write\_permissions](#output\_memory\_stm\_write\_permissions) | IAM permissions for writing to Short-Term Memory (STM) |
+| <a name="output_memory_stm_write_policy"></a> [memory\_stm\_write\_policy](#output\_memory\_stm\_write\_policy) | Policy document for granting Short-Term Memory (STM) write permissions |
 | <a name="output_runtime_role_arn"></a> [runtime\_role\_arn](#output\_runtime\_role\_arn) | ARN of the IAM role created for the Bedrock AgentCore Runtime |
 | <a name="output_runtime_role_name"></a> [runtime\_role\_name](#output\_runtime\_role\_name) | Name of the IAM role created for the Bedrock AgentCore Runtime |
 | <a name="output_user_pool_arn"></a> [user\_pool\_arn](#output\_user\_pool\_arn) | ARN of the Cognito User Pool created as JWT authentication fallback |
