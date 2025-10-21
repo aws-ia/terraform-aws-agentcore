@@ -232,21 +232,21 @@ The library provides three built-in LTM strategies. These are default strategies
 
 For example: An agent helps multiple users with cloud storage setup. From these conversations, see how each strategy processes users expressing confusion about account connection:
 
-**Summarization Strategy**
+#### Summarization Strategy
 
 This strategy compresses conversations into concise overviews, preserving essential context and key insights for quick recall. Extracted memory example: Users confused by cloud setup during onboarding.
 
 - Extracts concise summaries to preserve critical context and key insights
 - Namespace: `/strategies/{memoryStrategyId}/actors/{actorId}/sessions/{sessionId}`
 
-**Semantic Memory Strategy**
+#### Semantic Memory Strategy
 
 Distills general facts, concepts, and underlying meanings from raw conversational data, presenting the information in a context-independent format. Extracted memory example: In-context learning = task-solving via examples, no training needed.
 
 - Extracts general factual knowledge, concepts and meanings from raw conversations
 - Namespace: `/strategies/{memoryStrategyId}/actors/{actorId}`
 
-**User Preference Strategy**
+#### User Preference Strategy
 
 Captures individual preferences, interaction patterns, and personalized settings to enhance future experiences. Extracted memory example: User needs clear guidance on cloud storage account connection during onboarding.
 
