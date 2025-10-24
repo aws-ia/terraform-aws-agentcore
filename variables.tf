@@ -174,20 +174,20 @@ variable "memory_strategies" {
       namespaces = optional(list(string))
       configuration = optional(object({
         self_managed_configuration = optional(object({
-          historical_context_window_size = optional(number)
+          historical_context_window_size = optional(number, 4) # Default to 4 messages
           invocation_configuration = optional(object({
             payload_delivery_bucket_name = optional(string)
             topic_arn = optional(string)
           }))
           trigger_conditions = optional(list(object({
             message_based_trigger = optional(object({
-              message_count = optional(number)
+              message_count = optional(number, 1) # Default to 1 message
             }))
             time_based_trigger = optional(object({
-              idle_session_timeout = optional(number)
+              idle_session_timeout = optional(number, 10) # Default to 10 seconds
             }))
             token_based_trigger = optional(object({
-              token_count = optional(number)
+              token_count = optional(number, 100) # Default to 100 tokens
             }))
           })))
         }))

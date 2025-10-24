@@ -68,6 +68,17 @@ locals {
     "has_custom"
   )
   
+  # Check if any strategies are self-managed strategies that need S3/SNS access
+  has_self_managed_strategies = length(var.memory_strategies) > 0 && contains(
+    flatten([
+      for strategy in var.memory_strategies : 
+      strategy.custom_memory_strategy != null && 
+      strategy.custom_memory_strategy.configuration != null && 
+      strategy.custom_memory_strategy.configuration.self_managed_configuration != null ? ["has_self_managed"] : []
+    ]),
+    "has_self_managed"
+  )
+  
   # Only create a role if we have custom strategies that need model access
   create_memory_role = local.create_memory && var.memory_execution_role_arn == null && local.has_custom_strategies
 }
@@ -106,10 +117,74 @@ resource "aws_iam_role_policy_attachment" "memory_execution_policy" {
   policy_arn = data.aws_iam_policy.bedrock_memory_inference_policy.arn
 }
 
+# Create policy for self-managed memory strategies
+resource "aws_iam_policy" "memory_self_managed_policy" {
+  # Only create if we have a memory role AND self-managed strategies are present
+  count       = local.create_memory_role && local.has_self_managed_strategies ? 1 : 0
+  name        = "${random_string.solution_prefix.result}-bedrock-agent-memory-self-managed-policy"
+  description = "Policy for Bedrock AgentCore self-managed memory strategies"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "S3PayloadDelivery"
+        Effect = "Allow"
+        Action = [
+          "s3:GetBucketLocation",
+          "s3:PutObject"
+        ]
+        Resource = [
+          "arn:aws:s3:::*",
+          "arn:aws:s3:::*/*"
+        ]
+      },
+      {
+        Sid    = "SNSNotifications"
+        Effect = "Allow"
+        Action = [
+          "sns:GetTopicAttributes",
+          "sns:Publish"
+        ]
+        Resource = "arn:aws:sns:*:*:*"  
+      },
+      {
+        Sid    = "KMSPermissions"
+        Effect = "Allow"
+        Action = [
+          "kms:GenerateDataKey",
+          "kms:Decrypt"
+        ]
+        Resource = "*"  
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = [
+              "s3.*.amazonaws.com",
+              "sns.*.amazonaws.com"
+            ]
+          }
+        }
+      }
+    ]
+  })
+}
+
+# Attach the self-managed policy to the memory role
+resource "aws_iam_role_policy_attachment" "memory_self_managed_policy" {
+  # Only attach if we have a memory role AND self-managed strategies are present
+  count      = local.create_memory_role && local.has_self_managed_strategies ? 1 : 0
+  role       = aws_iam_role.memory_role[0].name
+  policy_arn = aws_iam_policy.memory_self_managed_policy[0].arn
+}
+
 # Add a time delay to ensure IAM role propagation
 resource "time_sleep" "memory_iam_role_propagation" {
   count           = local.create_memory_role ? 1 : 0
-  depends_on      = [aws_iam_role.memory_role, aws_iam_role_policy_attachment.memory_execution_policy]
+  depends_on      = [
+    aws_iam_role.memory_role,
+    aws_iam_role_policy_attachment.memory_execution_policy,
+    aws_iam_role_policy_attachment.memory_self_managed_policy
+  ]
   create_duration = "20s"
 }
 
@@ -216,8 +291,6 @@ resource "awscc_bedrockagentcore_memory" "agent_memory" {
   
   # Explicit dependency to avoid race conditions with IAM role creation
   depends_on = [
-    aws_iam_role.memory_role,
-    aws_iam_role_policy_attachment.memory_execution_policy,
     time_sleep.memory_iam_role_propagation
   ]
   
