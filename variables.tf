@@ -176,8 +176,9 @@ variable "memory_strategies" {
         self_managed_configuration = optional(object({
           historical_context_window_size = optional(number, 4) # Default to 4 messages
           invocation_configuration = optional(object({
-            payload_delivery_bucket_name = optional(string)
-            topic_arn = optional(string)
+            # Both fields are required when a self-managed configuration is used
+            payload_delivery_bucket_name = string
+            topic_arn = string
           }))
           trigger_conditions = optional(list(object({
             message_based_trigger = optional(object({
