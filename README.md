@@ -558,6 +558,7 @@ No modules.
 | [aws_cognito_user_pool.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cognito_user_pool) | resource |
 | [aws_cognito_user_pool_client.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cognito_user_pool_client) | resource |
 | [aws_cognito_user_pool_domain.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cognito_user_pool_domain) | resource |
+| [aws_iam_policy.memory_kms_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy) | resource |
 | [aws_iam_policy.memory_self_managed_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy) | resource |
 | [aws_iam_role.gateway_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role.memory_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
@@ -566,6 +567,7 @@ No modules.
 | [aws_iam_role_policy.runtime_role_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [aws_iam_role_policy.runtime_slr_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [aws_iam_role_policy_attachment.memory_execution_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
+| [aws_iam_role_policy_attachment.memory_kms_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
 | [aws_iam_role_policy_attachment.memory_self_managed_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
 | [aws_lambda_permission.cross_account_lambda_permissions](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_permission) | resource |
 | [awscc_bedrockagentcore_gateway.agent_gateway](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_gateway) | resource |
@@ -678,6 +680,7 @@ No modules.
 | <a name="output_memory_delete_policy"></a> [memory\_delete\_policy](#output\_memory\_delete\_policy) | Policy document for granting delete permissions to both STM and LTM |
 | <a name="output_memory_full_access_permissions"></a> [memory\_full\_access\_permissions](#output\_memory\_full\_access\_permissions) | Full access IAM permissions for all memory operations |
 | <a name="output_memory_full_access_policy"></a> [memory\_full\_access\_policy](#output\_memory\_full\_access\_policy) | Policy document for granting full access to all memory operations |
+| <a name="output_memory_kms_policy_arn"></a> [memory\_kms\_policy\_arn](#output\_memory\_kms\_policy\_arn) | ARN of the KMS policy for memory encryption (only available when KMS is provided) |
 | <a name="output_memory_ltm_delete_permissions"></a> [memory\_ltm\_delete\_permissions](#output\_memory\_ltm\_delete\_permissions) | IAM permissions for deleting from Long-Term Memory (LTM) |
 | <a name="output_memory_ltm_delete_policy"></a> [memory\_ltm\_delete\_policy](#output\_memory\_ltm\_delete\_policy) | Policy document for granting LTM delete permissions only |
 | <a name="output_memory_ltm_read_permissions"></a> [memory\_ltm\_read\_permissions](#output\_memory\_ltm\_read\_permissions) | IAM permissions for reading from Long-Term Memory (LTM) |

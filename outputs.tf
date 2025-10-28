@@ -99,6 +99,11 @@ output "memory_role_name" {
   value       = try(aws_iam_role.memory_role[0].name, null)
 }
 
+output "memory_kms_policy_arn" {
+  description = "ARN of the KMS policy for memory encryption (only available when KMS is provided)"
+  value       = local.create_kms_policy ? aws_iam_policy.memory_kms_policy[0].arn : null
+}
+
 # Raw permission lists
 output "memory_stm_write_permissions" {
   description = "IAM permissions for writing to Short-Term Memory (STM)"

@@ -54,6 +54,12 @@ locals {
   create_memory = var.create_memory
   # Sanitize memory name to ensure it follows the regex pattern ^[a-zA-Z][a-zA-Z0-9_]{0,47}$
   sanitized_memory_name = replace(var.memory_name, "-", "_")
+  
+  # Determine if KMS is being used for memory encryption
+  kms_provided = var.memory_encryption_key_arn != null
+  
+  # Determine if we need to create a KMS policy
+  create_kms_policy = local.create_memory && local.kms_provided
 }
 
 # Determine if we need to create an IAM role for the memory
@@ -80,7 +86,7 @@ locals {
   )
   
   # Only create a role if we have custom strategies that need model access
-  create_memory_role = local.create_memory && var.memory_execution_role_arn == null && local.has_custom_strategies
+  create_memory_role = local.create_memory && var.memory_execution_role_arn == null && (local.has_custom_strategies || local.create_kms_policy)
 }
 
 # IAM Role for Agent Memory 
@@ -112,7 +118,7 @@ data "aws_iam_policy" "bedrock_memory_inference_policy" {
 
 # Attach the managed policy to the memory role
 resource "aws_iam_role_policy_attachment" "memory_execution_policy" {
-  count      = local.create_memory_role ? 1 : 0
+  count      = local.create_memory_role && local.has_custom_strategies ? 1 : 0
   role       = aws_iam_role.memory_role[0].name
   policy_arn = data.aws_iam_policy.bedrock_memory_inference_policy.arn
 }
@@ -174,24 +180,6 @@ resource "aws_iam_policy" "memory_self_managed_policy" {
           "sns:Publish"
         ]
         Resource = local.sns_topic_arns
-      },
-      # KMS permissions
-      {
-        Sid    = "KMSPermissions"
-        Effect = "Allow"
-        Action = [
-          "kms:GenerateDataKey",
-          "kms:Decrypt"
-        ]
-        Resource = "*"  
-        Condition = {
-          StringEquals = {
-            "kms:ViaService" = [
-              "s3.*.amazonaws.com",
-              "sns.*.amazonaws.com"
-            ]
-          }
-        }
       }
     ]
   })
@@ -205,13 +193,55 @@ resource "aws_iam_role_policy_attachment" "memory_self_managed_policy" {
   policy_arn = aws_iam_policy.memory_self_managed_policy[0].arn
 }
 
+# Create policy for KMS access when memory_encryption_key_arn is provided
+resource "aws_iam_policy" "memory_kms_policy" {
+  # Create if KMS is provided, independent of whether we have a custom strategy role
+  count       = local.create_kms_policy ? 1 : 0
+  name        = "${random_string.solution_prefix.result}-bedrock-agent-memory-kms-policy"
+  description = "Policy for Bedrock AgentCore memory KMS access"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowAgentCoreMemoryKMS"
+        Effect = "Allow"
+        Action = [
+          "kms:CreateGrant",
+          "kms:Decrypt",
+          "kms:DescribeKey",
+          "kms:GenerateDataKey",
+          "kms:GenerateDataKeyWithoutPlaintext",
+          "kms:ReEncrypt*"
+        ]
+        Resource = var.memory_encryption_key_arn
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "bedrock-agentcore.*.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+}
+
+# Attach the KMS policy to the memory role when KMS is provided and a role exists
+resource "aws_iam_role_policy_attachment" "memory_kms_policy" {
+  # Only attach if we have both a memory role AND KMS is provided
+  count      = local.create_memory_role && local.create_kms_policy ? 1 : 0
+  role       = aws_iam_role.memory_role[0].name
+  policy_arn = aws_iam_policy.memory_kms_policy[0].arn
+}
+
+
 # Add a time delay to ensure IAM role propagation
 resource "time_sleep" "memory_iam_role_propagation" {
   count           = local.create_memory_role ? 1 : 0
   depends_on      = [
     aws_iam_role.memory_role,
     aws_iam_role_policy_attachment.memory_execution_policy,
-    aws_iam_role_policy_attachment.memory_self_managed_policy
+    aws_iam_role_policy_attachment.memory_self_managed_policy,
+    aws_iam_role_policy_attachment.memory_kms_policy
   ]
   create_duration = "20s"
 }
