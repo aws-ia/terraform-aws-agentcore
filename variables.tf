@@ -112,6 +112,124 @@ variable "runtime_endpoint_tags" {
   default     = null
 }
 
+# – Agent Core Memory –
+
+variable "create_memory" {
+  description = "Whether or not to create an agent core memory."
+  type        = bool
+  default     = false
+}
+
+variable "memory_name" {
+  description = "The name of the agent core memory."
+  type        = string
+  default     = "TerraformBedrockAgentCoreMemory"
+}
+
+variable "memory_description" {
+  description = "Description of the agent core memory."
+  type        = string
+  default     = null
+}
+
+variable "memory_event_expiry_duration" {
+  description = "Duration in days until memory events expire."
+  type        = number
+  default     = 90
+}
+
+variable "memory_execution_role_arn" {
+  description = "Optional IAM role ARN for the Bedrock agent core memory."
+  type        = string
+  default     = null
+}
+
+variable "memory_encryption_key_arn" {
+  description = "The ARN of the KMS key used to encrypt the memory."
+  type        = string
+  default     = null
+}
+
+variable "memory_strategies" {
+  description = "List of memory strategies attached to this memory."
+  type = list(object({
+    semantic_memory_strategy = optional(object({
+      name = optional(string)
+      description = optional(string)
+      namespaces = optional(list(string))
+    }))
+    summary_memory_strategy = optional(object({
+      name = optional(string)
+      description = optional(string)
+      namespaces = optional(list(string))
+    }))
+    user_preference_memory_strategy = optional(object({
+      name = optional(string)
+      description = optional(string)
+      namespaces = optional(list(string))
+    }))
+    custom_memory_strategy = optional(object({
+      name = optional(string)
+      description = optional(string)
+      namespaces = optional(list(string))
+      configuration = optional(object({
+        self_managed_configuration = optional(object({
+          historical_context_window_size = optional(number, 4) # Default to 4 messages
+          invocation_configuration = object({
+            # Both fields are required when a self-managed configuration is used
+            payload_delivery_bucket_name = string
+            topic_arn = string
+          })
+          trigger_conditions = optional(list(object({
+            message_based_trigger = optional(object({
+              message_count = optional(number, 1) # Default to 1 message
+            }))
+            time_based_trigger = optional(object({
+              idle_session_timeout = optional(number, 10) # Default to 10 seconds
+            }))
+            token_based_trigger = optional(object({
+              token_count = optional(number, 100) # Default to 100 tokens
+            }))
+          })))
+        }))
+        semantic_override = optional(object({
+          consolidation = optional(object({
+            append_to_prompt = optional(string)
+            model_id = optional(string)
+          }))
+          extraction = optional(object({
+            append_to_prompt = optional(string)
+            model_id = optional(string)
+          }))
+        }))
+        summary_override = optional(object({
+          consolidation = optional(object({
+            append_to_prompt = optional(string)
+            model_id = optional(string)
+          }))
+        }))
+        user_preference_override = optional(object({
+          consolidation = optional(object({
+            append_to_prompt = optional(string)
+            model_id = optional(string)
+          }))
+          extraction = optional(object({
+            append_to_prompt = optional(string)
+            model_id = optional(string)
+          }))
+        }))
+      }))
+    }))
+  }))
+  default = []
+}
+
+variable "memory_tags" {
+  description = "A map of tag keys and values for the agent core memory."
+  type        = map(string)
+  default     = null
+}
+
 # – Agent Core Gateway –
 
 variable "create_gateway" {

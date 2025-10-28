@@ -18,6 +18,7 @@ locals {
 }
 
 resource "random_password" "password" {
+  count = local.create_user_pool && var.user_pool_create_admin ? 1 : 0
   length           = 16
   special          = true
   override_special = "!#$%&*()-_=+[]{}<>:?"
@@ -133,5 +134,5 @@ resource "aws_cognito_user" "admin" {
     email_verified = "true"
   }
 
-  password = random_password.password.result
+  password = random_password.password[0].result
 }
