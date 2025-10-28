@@ -117,6 +117,29 @@ resource "aws_iam_role_policy_attachment" "memory_execution_policy" {
   policy_arn = data.aws_iam_policy.bedrock_memory_inference_policy.arn
 }
 
+# Extract all payload bucket names and SNS topics from memory strategies
+locals {
+  # Get all unique bucket names from self-managed strategies
+  s3_bucket_names = distinct(compact([
+    for strategy in var.memory_strategies : 
+      try(strategy.custom_memory_strategy.configuration.self_managed_configuration.invocation_configuration.payload_delivery_bucket_name, null)
+      if strategy.custom_memory_strategy != null && 
+         strategy.custom_memory_strategy.configuration != null && 
+         strategy.custom_memory_strategy.configuration.self_managed_configuration != null &&
+         strategy.custom_memory_strategy.configuration.self_managed_configuration.invocation_configuration != null
+  ]))
+  
+  # Get all unique SNS topic ARNs from self-managed strategies
+  sns_topic_arns = distinct(compact([
+    for strategy in var.memory_strategies : 
+      try(strategy.custom_memory_strategy.configuration.self_managed_configuration.invocation_configuration.topic_arn, null)
+      if strategy.custom_memory_strategy != null && 
+         strategy.custom_memory_strategy.configuration != null && 
+         strategy.custom_memory_strategy.configuration.self_managed_configuration != null &&
+         strategy.custom_memory_strategy.configuration.self_managed_configuration.invocation_configuration != null
+  ]))
+}
+
 # Create policy for self-managed memory strategies
 resource "aws_iam_policy" "memory_self_managed_policy" {
   # Only create if we have a memory role AND self-managed strategies are present
@@ -127,6 +150,7 @@ resource "aws_iam_policy" "memory_self_managed_policy" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
+      # S3 bucket permissions
       {
         Sid    = "S3PayloadDelivery"
         Effect = "Allow"
@@ -134,11 +158,14 @@ resource "aws_iam_policy" "memory_self_managed_policy" {
           "s3:GetBucketLocation",
           "s3:PutObject"
         ]
-        Resource = [
-          "arn:aws:s3:::*",
-          "arn:aws:s3:::*/*"
-        ]
+        Resource = flatten([
+          for bucket in local.s3_bucket_names : [
+            "arn:aws:s3:::${bucket}",
+            "arn:aws:s3:::${bucket}/*"
+          ]
+        ])
       },
+      # SNS topic permissions
       {
         Sid    = "SNSNotifications"
         Effect = "Allow"
@@ -146,8 +173,9 @@ resource "aws_iam_policy" "memory_self_managed_policy" {
           "sns:GetTopicAttributes",
           "sns:Publish"
         ]
-        Resource = "arn:aws:sns:*:*:*"  
+        Resource = local.sns_topic_arns
       },
+      # KMS permissions
       {
         Sid    = "KMSPermissions"
         Effect = "Allow"
