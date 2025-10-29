@@ -449,8 +449,8 @@ variable "browser_network_configuration" {
   default = null
   
   validation {
-    condition     = var.browser_network_mode != "VPC" || (var.browser_network_configuration != null && length(coalesce(var.browser_network_configuration.security_groups, [])) > 0 && length(coalesce(var.browser_network_configuration.subnets, [])) > 0)
-    error_message = "When browser_network_mode is 'VPC', you must provide browser_network_configuration with at least one security group and one subnet."
+    condition     = var.browser_network_configuration == null || (length(coalesce(var.browser_network_configuration.security_groups, [])) > 0 && length(coalesce(var.browser_network_configuration.subnets, [])) > 0)
+    error_message = "When providing browser_network_configuration, you must include at least one security group and one subnet."
   }
 }
 
@@ -458,11 +458,6 @@ variable "browser_recording_enabled" {
   description = "Whether to enable browser session recording to S3."
   type        = bool
   default     = false
-  
-  validation {
-    condition     = !var.browser_recording_enabled || var.browser_recording_config != null
-    error_message = "When browser_recording_enabled is true, you must provide browser_recording_config with valid bucket and prefix values."
-  }
 }
 
 variable "browser_recording_config" {
