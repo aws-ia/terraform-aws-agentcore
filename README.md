@@ -457,17 +457,20 @@ module "agentcore" {
   browser_name = "MyBrowser"
   browser_description = "Custom browser for my Bedrock agent"
   browser_network_mode = "PUBLIC"  # PUBLIC or VPC
+
   # Optional: Enable recording to S3
   browser_recording_enabled = true
   browser_recording_config = {
     bucket = "my-browser-recordings-bucket"
     prefix = "recordings/"
   }
+
   # Optional: For VPC network mode
   # browser_network_configuration = {
   #   security_groups = ["enter_security_group"]
   #   subnets         = ["enter_subnet"]
   # }
+
   browser_tags = {
     Environment = "production"
     Project     = "ai-assistants"
@@ -512,11 +515,13 @@ module "agentcore" {
   code_interpreter_name = "MyCodeInterpreter"
   code_interpreter_description = "Custom code interpreter for my Bedrock agent"
   code_interpreter_network_mode = "SANDBOX"  # SANDBOX or VPC
+
   # Optional: For VPC network mode
   # code_interpreter_network_configuration = {
   #   security_groups = ["enter-sg"]
   #   subnets         = ["enter-subnet"]
   # }
+
   code_interpreter_tags = {
     Environment = "production"
     Project     = "ai-assistants"
