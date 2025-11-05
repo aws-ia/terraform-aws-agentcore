@@ -19,7 +19,7 @@ This module simplifies the process of:
 ## Features
 
 - **Custom Container Support**: Deploy your own container images from Amazon ECR
-- **Flexible Networking**: Support for both PUBLIC and VPC network modes
+- **Flexible Networking**: Support for both PUBLIC and VPC network modes for runtimes, and SANDBOX and VPC modes for code interpreters
 - **IAM Role Management**: Automatic creation of IAM roles with appropriate permissions
 - **Environment Variables**: Pass configuration to your runtime container
 - **JWT Authorization**: Optional JWT authorizer configuration for secure access
@@ -34,6 +34,8 @@ This module simplifies the process of:
 - **Granular Permissions**: Control gateway create, read, update, and delete permissions
 - **OAuth2 Outbound Authorization**: Configure OAuth client for gateway outbound authorization
 - **API Key Outbound Authorization**: Configure API key for gateway outbound authorization
+- **Code Interpreter**: Create and manage custom code interpreter resources for Bedrock agents
+- **Browser Custom**: Create and manage custom browser resources for Bedrock agents with recording capabilities
 
 ## Usage
 
@@ -423,6 +425,110 @@ Available policy documents include:
 - `memory_admin_policy` - For control plane admin permissions
 - `memory_full_access_policy` - For full access to all operations
 
+### AgentCore Browser Custom
+
+The Amazon Bedrock AgentCore Browser provides a secure, cloud-based browser that enables AI agents to interact with websites. It includes security features such as session isolation, built-in observability through live viewing, CloudTrail logging, and session replay capabilities.
+
+Additional information about the browser tool can be found in the official [documentation](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/browser-tool.html).
+
+#### Browser Network modes
+
+The Browser construct supports the following network modes:
+
+1. Public Network Mode - Default
+
+- Allows internet access for web browsing and external API calls
+- Suitable for scenarios where agents need to interact with publicly available websites
+- Enables full web browsing capabilities
+- VPC mode is not supported with this option
+
+2. VPC (Virtual Private Cloud)
+
+- Select whether to run the browser in a virtual private cloud (VPC).
+- By configuring VPC connectivity, you enable secure access to private resources such as databases, internal APIs, and services within your VPC.
+
+```hcl
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.2"
+
+  # Enable Agent Core Browser Custom
+  create_browser = true
+  browser_name = "MyBrowser"
+  browser_description = "Custom browser for my Bedrock agent"
+  browser_network_mode = "PUBLIC"  # PUBLIC or VPC
+
+  # Optional: Enable recording to S3
+  browser_recording_enabled = true
+  browser_recording_config = {
+    bucket = "my-browser-recordings-bucket"
+    prefix = "recordings/"
+  }
+
+  # Optional: For VPC network mode
+  # browser_network_configuration = {
+  #   security_groups = ["enter_security_group"]
+  #   subnets         = ["enter_subnet"]
+  # }
+
+  browser_tags = {
+    Environment = "production"
+    Project     = "ai-assistants"
+  }
+}
+```
+
+### AgentCore Code Interpreter Custom
+
+The Amazon Bedrock AgentCore Code Interpreter enables AI agents to write and execute code securely in sandbox environments, enhancing their accuracy and expanding their ability to solve complex end-to-end tasks. This is critical in Agentic AI applications where the agents may execute arbitrary code that can lead to data compromise or security risks. The AgentCore Code Interpreter tool provides secure code execution, which helps you avoid running into these issues.
+
+For more information about code interpreter, please refer to the [official documentation](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/code-interpreter-tool.html).
+
+#### Code Interpreter Network Modes
+
+The Code Interpreter construct supports the following network modes:
+
+1. Public Network Mode - Default
+
+- Allows internet access for package installation and external API calls
+- Suitable for development and testing environments
+- Enables downloading Python packages from PyPI
+
+2. Sandbox Network Mode
+
+- Isolated network environment with no internet access
+- Suitable for production environments with strict security requirements
+- Only allows access to pre-installed packages and local resources
+
+3. VPC (Virtual Private Cloud)
+
+- Select whether to run the browser in a virtual private cloud (VPC).
+- By configuring VPC connectivity, you enable secure access to private resources such as databases, internal APIs, and services within your VPC.
+
+```hcl
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.2"
+
+  # Enable Agent Core Code Interpreter Custom
+  create_code_interpreter = true
+  code_interpreter_name = "MyCodeInterpreter"
+  code_interpreter_description = "Custom code interpreter for my Bedrock agent"
+  code_interpreter_network_mode = "SANDBOX"  # SANDBOX or VPC
+
+  # Optional: For VPC network mode
+  # code_interpreter_network_configuration = {
+  #   security_groups = ["enter-sg"]
+  #   subnets         = ["enter-subnet"]
+  # }
+
+  code_interpreter_tags = {
+    Environment = "production"
+    Project     = "ai-assistants"
+  }
+}
+```
+
 ## Architecture
 
 The module creates the following resources:
@@ -560,9 +666,13 @@ No modules.
 | [aws_cognito_user_pool_domain.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cognito_user_pool_domain) | resource |
 | [aws_iam_policy.memory_kms_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy) | resource |
 | [aws_iam_policy.memory_self_managed_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy) | resource |
+| [aws_iam_role.browser_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
+| [aws_iam_role.code_interpreter_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role.gateway_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role.memory_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role.runtime_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
+| [aws_iam_role_policy.browser_role_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
+| [aws_iam_role_policy.code_interpreter_role_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [aws_iam_role_policy.gateway_role_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [aws_iam_role_policy.runtime_role_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [aws_iam_role_policy.runtime_slr_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
@@ -570,12 +680,16 @@ No modules.
 | [aws_iam_role_policy_attachment.memory_kms_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
 | [aws_iam_role_policy_attachment.memory_self_managed_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
 | [aws_lambda_permission.cross_account_lambda_permissions](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_permission) | resource |
+| [awscc_bedrockagentcore_browser_custom.agent_browser](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_browser_custom) | resource |
+| [awscc_bedrockagentcore_code_interpreter_custom.agent_code_interpreter](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_code_interpreter_custom) | resource |
 | [awscc_bedrockagentcore_gateway.agent_gateway](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_gateway) | resource |
 | [awscc_bedrockagentcore_memory.agent_memory](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_memory) | resource |
 | [awscc_bedrockagentcore_runtime.agent_runtime](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_runtime) | resource |
 | [awscc_bedrockagentcore_runtime_endpoint.agent_runtime_endpoint](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_runtime_endpoint) | resource |
 | [random_password.password](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
 | [random_string.solution_prefix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
+| [time_sleep.browser_iam_role_propagation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
+| [time_sleep.code_interpreter_iam_role_propagation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
 | [time_sleep.iam_role_propagation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
 | [time_sleep.memory_iam_role_propagation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
@@ -589,6 +703,22 @@ No modules.
 |------|-------------|------|---------|:--------:|
 | <a name="input_apikey_credential_provider_arn"></a> [apikey\_credential\_provider\_arn](#input\_apikey\_credential\_provider\_arn) | ARN of the API key credential provider created with CreateApiKeyCredentialProvider. Required when enable\_apikey\_outbound\_auth is true. | `string` | `null` | no |
 | <a name="input_apikey_secret_arn"></a> [apikey\_secret\_arn](#input\_apikey\_secret\_arn) | ARN of the AWS Secrets Manager secret containing the API key. Required when enable\_apikey\_outbound\_auth is true. | `string` | `null` | no |
+| <a name="input_browser_description"></a> [browser\_description](#input\_browser\_description) | Description of the agent core browser. | `string` | `null` | no |
+| <a name="input_browser_name"></a> [browser\_name](#input\_browser\_name) | The name of the agent core browser. Valid characters are a-z, A-Z, 0-9, \_ (underscore). The name must start with a letter and can be up to 48 characters long. | `string` | `"TerraformBedrockAgentCoreBrowser"` | no |
+| <a name="input_browser_network_configuration"></a> [browser\_network\_configuration](#input\_browser\_network\_configuration) | VPC network configuration for the agent core browser. Required when browser\_network\_mode is set to 'VPC'. | <pre>object({<br>    security_groups = optional(list(string))<br>    subnets         = optional(list(string))<br>  })</pre> | `null` | no |
+| <a name="input_browser_network_mode"></a> [browser\_network\_mode](#input\_browser\_network\_mode) | Network mode configuration type for the agent core browser. Valid values: PUBLIC, VPC. | `string` | `"PUBLIC"` | no |
+| <a name="input_browser_recording_config"></a> [browser\_recording\_config](#input\_browser\_recording\_config) | Configuration for browser session recording when enabled. Bucket name must follow S3 naming conventions (lowercase alphanumeric characters, dots, and hyphens), between 3 and 63 characters, starting and ending with alphanumeric character. | <pre>object({<br>    bucket = string<br>    prefix = string<br>  })</pre> | `null` | no |
+| <a name="input_browser_recording_enabled"></a> [browser\_recording\_enabled](#input\_browser\_recording\_enabled) | Whether to enable browser session recording to S3. | `bool` | `false` | no |
+| <a name="input_browser_role_arn"></a> [browser\_role\_arn](#input\_browser\_role\_arn) | Optional external IAM role ARN for the Bedrock agent core browser. If empty, the module will create one internally. | `string` | `null` | no |
+| <a name="input_browser_tags"></a> [browser\_tags](#input\_browser\_tags) | A map of tag keys and values for the agent core browser. Each tag key and value must be between 1 and 256 characters and can only include alphanumeric characters, spaces, and the following special characters: \_ . : / = + @ - | `map(string)` | `null` | no |
+| <a name="input_code_interpreter_description"></a> [code\_interpreter\_description](#input\_code\_interpreter\_description) | Description of the agent core code interpreter. Valid characters are a-z, A-Z, 0-9, \_ (underscore), - (hyphen) and spaces. The description can have up to 200 characters. | `string` | `null` | no |
+| <a name="input_code_interpreter_name"></a> [code\_interpreter\_name](#input\_code\_interpreter\_name) | The name of the agent core code interpreter. Valid characters are a-z, A-Z, 0-9, \_ (underscore). The name must start with a letter and can be up to 48 characters long. | `string` | `"TerraformBedrockAgentCoreCodeInterpreter"` | no |
+| <a name="input_code_interpreter_network_configuration"></a> [code\_interpreter\_network\_configuration](#input\_code\_interpreter\_network\_configuration) | VPC network configuration for the agent core code interpreter. | <pre>object({<br>    security_groups = optional(list(string))<br>    subnets         = optional(list(string))<br>  })</pre> | `null` | no |
+| <a name="input_code_interpreter_network_mode"></a> [code\_interpreter\_network\_mode](#input\_code\_interpreter\_network\_mode) | Network mode configuration type for the agent core code interpreter. Valid values: SANDBOX, VPC. | `string` | `"SANDBOX"` | no |
+| <a name="input_code_interpreter_role_arn"></a> [code\_interpreter\_role\_arn](#input\_code\_interpreter\_role\_arn) | Optional external IAM role ARN for the Bedrock agent core code interpreter. If empty, the module will create one internally. | `string` | `null` | no |
+| <a name="input_code_interpreter_tags"></a> [code\_interpreter\_tags](#input\_code\_interpreter\_tags) | A map of tag keys and values for the agent core code interpreter. Each tag key and value must be between 1 and 256 characters and can only include alphanumeric characters, spaces, and the following special characters: \_ . : / = + @ - | `map(string)` | `null` | no |
+| <a name="input_create_browser"></a> [create\_browser](#input\_create\_browser) | Whether or not to create an agent core browser custom. | `bool` | `false` | no |
+| <a name="input_create_code_interpreter"></a> [create\_code\_interpreter](#input\_create\_code\_interpreter) | Whether or not to create an agent core code interpreter custom. | `bool` | `false` | no |
 | <a name="input_create_gateway"></a> [create\_gateway](#input\_create\_gateway) | Whether or not to create an agent core gateway. | `bool` | `false` | no |
 | <a name="input_create_memory"></a> [create\_memory](#input\_create\_memory) | Whether or not to create an agent core memory. | `bool` | `false` | no |
 | <a name="input_create_runtime"></a> [create\_runtime](#input\_create\_runtime) | Whether or not to create an agent core runtime. | `bool` | `false` | no |
@@ -649,6 +779,18 @@ No modules.
 
 | Name | Description |
 |------|-------------|
+| <a name="output_agent_browser_arn"></a> [agent\_browser\_arn](#output\_agent\_browser\_arn) | ARN of the created Bedrock AgentCore Browser Custom |
+| <a name="output_agent_browser_created_at"></a> [agent\_browser\_created\_at](#output\_agent\_browser\_created\_at) | Creation timestamp of the created Bedrock AgentCore Browser Custom |
+| <a name="output_agent_browser_failure_reason"></a> [agent\_browser\_failure\_reason](#output\_agent\_browser\_failure\_reason) | Failure reason if the Bedrock AgentCore Browser Custom failed |
+| <a name="output_agent_browser_id"></a> [agent\_browser\_id](#output\_agent\_browser\_id) | ID of the created Bedrock AgentCore Browser Custom |
+| <a name="output_agent_browser_last_updated_at"></a> [agent\_browser\_last\_updated\_at](#output\_agent\_browser\_last\_updated\_at) | Last update timestamp of the created Bedrock AgentCore Browser Custom |
+| <a name="output_agent_browser_status"></a> [agent\_browser\_status](#output\_agent\_browser\_status) | Status of the created Bedrock AgentCore Browser Custom |
+| <a name="output_agent_code_interpreter_arn"></a> [agent\_code\_interpreter\_arn](#output\_agent\_code\_interpreter\_arn) | ARN of the created Bedrock AgentCore Code Interpreter Custom |
+| <a name="output_agent_code_interpreter_created_at"></a> [agent\_code\_interpreter\_created\_at](#output\_agent\_code\_interpreter\_created\_at) | Creation timestamp of the created Bedrock AgentCore Code Interpreter Custom |
+| <a name="output_agent_code_interpreter_failure_reason"></a> [agent\_code\_interpreter\_failure\_reason](#output\_agent\_code\_interpreter\_failure\_reason) | Failure reason if the Bedrock AgentCore Code Interpreter Custom failed |
+| <a name="output_agent_code_interpreter_id"></a> [agent\_code\_interpreter\_id](#output\_agent\_code\_interpreter\_id) | ID of the created Bedrock AgentCore Code Interpreter Custom |
+| <a name="output_agent_code_interpreter_last_updated_at"></a> [agent\_code\_interpreter\_last\_updated\_at](#output\_agent\_code\_interpreter\_last\_updated\_at) | Last update timestamp of the created Bedrock AgentCore Code Interpreter Custom |
+| <a name="output_agent_code_interpreter_status"></a> [agent\_code\_interpreter\_status](#output\_agent\_code\_interpreter\_status) | Status of the created Bedrock AgentCore Code Interpreter Custom |
 | <a name="output_agent_gateway_arn"></a> [agent\_gateway\_arn](#output\_agent\_gateway\_arn) | ARN of the created Bedrock AgentCore Gateway |
 | <a name="output_agent_gateway_id"></a> [agent\_gateway\_id](#output\_agent\_gateway\_id) | ID of the created Bedrock AgentCore Gateway |
 | <a name="output_agent_gateway_status"></a> [agent\_gateway\_status](#output\_agent\_gateway\_status) | Status of the created Bedrock AgentCore Gateway |
@@ -670,6 +812,38 @@ No modules.
 | <a name="output_agent_runtime_status"></a> [agent\_runtime\_status](#output\_agent\_runtime\_status) | Status of the created Bedrock AgentCore Runtime |
 | <a name="output_agent_runtime_version"></a> [agent\_runtime\_version](#output\_agent\_runtime\_version) | Version of the created Bedrock AgentCore Runtime |
 | <a name="output_agent_runtime_workload_identity_details"></a> [agent\_runtime\_workload\_identity\_details](#output\_agent\_runtime\_workload\_identity\_details) | Workload identity details of the created Bedrock AgentCore Runtime |
+| <a name="output_browser_admin_permissions"></a> [browser\_admin\_permissions](#output\_browser\_admin\_permissions) | IAM permissions for browser administration operations |
+| <a name="output_browser_admin_policy"></a> [browser\_admin\_policy](#output\_browser\_admin\_policy) | Policy document for browser administration |
+| <a name="output_browser_full_access_permissions"></a> [browser\_full\_access\_permissions](#output\_browser\_full\_access\_permissions) | Full access IAM permissions for all browser operations |
+| <a name="output_browser_full_access_policy"></a> [browser\_full\_access\_policy](#output\_browser\_full\_access\_policy) | Policy document for granting full access to Bedrock AgentCore Browser operations |
+| <a name="output_browser_list_permissions"></a> [browser\_list\_permissions](#output\_browser\_list\_permissions) | IAM permissions for listing browser resources |
+| <a name="output_browser_list_policy"></a> [browser\_list\_policy](#output\_browser\_list\_policy) | Policy document for listing browser resources |
+| <a name="output_browser_read_permissions"></a> [browser\_read\_permissions](#output\_browser\_read\_permissions) | IAM permissions for reading browser information |
+| <a name="output_browser_read_policy"></a> [browser\_read\_policy](#output\_browser\_read\_policy) | Policy document for reading browser information |
+| <a name="output_browser_role_arn"></a> [browser\_role\_arn](#output\_browser\_role\_arn) | ARN of the IAM role created for the Bedrock AgentCore Browser Custom |
+| <a name="output_browser_role_name"></a> [browser\_role\_name](#output\_browser\_role\_name) | Name of the IAM role created for the Bedrock AgentCore Browser Custom |
+| <a name="output_browser_session_permissions"></a> [browser\_session\_permissions](#output\_browser\_session\_permissions) | IAM permissions for managing browser sessions |
+| <a name="output_browser_session_policy"></a> [browser\_session\_policy](#output\_browser\_session\_policy) | Policy document for browser session management |
+| <a name="output_browser_stream_permissions"></a> [browser\_stream\_permissions](#output\_browser\_stream\_permissions) | IAM permissions for browser streaming operations |
+| <a name="output_browser_stream_policy"></a> [browser\_stream\_policy](#output\_browser\_stream\_policy) | Policy document for browser streaming operations |
+| <a name="output_browser_use_permissions"></a> [browser\_use\_permissions](#output\_browser\_use\_permissions) | IAM permissions for using browser functionality |
+| <a name="output_browser_use_policy"></a> [browser\_use\_policy](#output\_browser\_use\_policy) | Policy document for using browser functionality |
+| <a name="output_code_interpreter_admin_permissions"></a> [code\_interpreter\_admin\_permissions](#output\_code\_interpreter\_admin\_permissions) | IAM permissions for code interpreter administration operations |
+| <a name="output_code_interpreter_admin_policy"></a> [code\_interpreter\_admin\_policy](#output\_code\_interpreter\_admin\_policy) | Policy document for code interpreter administration |
+| <a name="output_code_interpreter_full_access_permissions"></a> [code\_interpreter\_full\_access\_permissions](#output\_code\_interpreter\_full\_access\_permissions) | Full access IAM permissions for all code interpreter operations |
+| <a name="output_code_interpreter_full_access_policy"></a> [code\_interpreter\_full\_access\_policy](#output\_code\_interpreter\_full\_access\_policy) | Policy document for granting full access to Bedrock AgentCore Code Interpreter operations |
+| <a name="output_code_interpreter_invoke_permissions"></a> [code\_interpreter\_invoke\_permissions](#output\_code\_interpreter\_invoke\_permissions) | IAM permissions for invoking code interpreter |
+| <a name="output_code_interpreter_invoke_policy"></a> [code\_interpreter\_invoke\_policy](#output\_code\_interpreter\_invoke\_policy) | Policy document for code interpreter invocation operations |
+| <a name="output_code_interpreter_list_permissions"></a> [code\_interpreter\_list\_permissions](#output\_code\_interpreter\_list\_permissions) | IAM permissions for listing code interpreter resources |
+| <a name="output_code_interpreter_list_policy"></a> [code\_interpreter\_list\_policy](#output\_code\_interpreter\_list\_policy) | Policy document for listing code interpreter resources |
+| <a name="output_code_interpreter_read_permissions"></a> [code\_interpreter\_read\_permissions](#output\_code\_interpreter\_read\_permissions) | IAM permissions for reading code interpreter information |
+| <a name="output_code_interpreter_read_policy"></a> [code\_interpreter\_read\_policy](#output\_code\_interpreter\_read\_policy) | Policy document for reading code interpreter information |
+| <a name="output_code_interpreter_role_arn"></a> [code\_interpreter\_role\_arn](#output\_code\_interpreter\_role\_arn) | ARN of the IAM role created for the Bedrock AgentCore Code Interpreter Custom |
+| <a name="output_code_interpreter_role_name"></a> [code\_interpreter\_role\_name](#output\_code\_interpreter\_role\_name) | Name of the IAM role created for the Bedrock AgentCore Code Interpreter Custom |
+| <a name="output_code_interpreter_session_permissions"></a> [code\_interpreter\_session\_permissions](#output\_code\_interpreter\_session\_permissions) | IAM permissions for managing code interpreter sessions |
+| <a name="output_code_interpreter_session_policy"></a> [code\_interpreter\_session\_policy](#output\_code\_interpreter\_session\_policy) | Policy document for code interpreter session management |
+| <a name="output_code_interpreter_use_permissions"></a> [code\_interpreter\_use\_permissions](#output\_code\_interpreter\_use\_permissions) | IAM permissions for using code interpreter functionality |
+| <a name="output_code_interpreter_use_policy"></a> [code\_interpreter\_use\_policy](#output\_code\_interpreter\_use\_policy) | Policy document for using code interpreter functionality |
 | <a name="output_cognito_discovery_url"></a> [cognito\_discovery\_url](#output\_cognito\_discovery\_url) | OpenID Connect discovery URL for the Cognito User Pool |
 | <a name="output_cognito_domain"></a> [cognito\_domain](#output\_cognito\_domain) | Domain of the Cognito User Pool |
 | <a name="output_gateway_role_arn"></a> [gateway\_role\_arn](#output\_gateway\_role\_arn) | ARN of the IAM role created for the Bedrock AgentCore Gateway |

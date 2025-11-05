@@ -398,6 +398,201 @@ variable "apikey_secret_arn" {
   default     = null
 }
 
+# – Agent Core Browser Custom –
+
+variable "create_browser" {
+  description = "Whether or not to create an agent core browser custom."
+  type        = bool
+  default     = false
+}
+
+variable "browser_name" {
+  description = "The name of the agent core browser. Valid characters are a-z, A-Z, 0-9, _ (underscore). The name must start with a letter and can be up to 48 characters long."
+  type        = string
+  default     = "TerraformBedrockAgentCoreBrowser"
+  
+  validation {
+    condition     = can(regex("^[a-zA-Z][a-zA-Z0-9_]{0,47}$", var.browser_name))
+    error_message = "The browser_name must start with a letter and can only include letters, numbers, and underscores, with a maximum length of 48 characters."
+  }
+}
+
+variable "browser_description" {
+  description = "Description of the agent core browser."
+  type        = string
+  default     = null
+}
+
+variable "browser_role_arn" {
+  description = "Optional external IAM role ARN for the Bedrock agent core browser. If empty, the module will create one internally."
+  type        = string
+  default     = null
+}
+
+variable "browser_network_mode" {
+  description = "Network mode configuration type for the agent core browser. Valid values: PUBLIC, VPC."
+  type        = string
+  default     = "PUBLIC"
+
+  validation {
+    condition     = contains(["PUBLIC", "VPC"], var.browser_network_mode)
+    error_message = "The browser_network_mode must be either PUBLIC or VPC."
+  }
+}
+
+variable "browser_network_configuration" {
+  description = "VPC network configuration for the agent core browser. Required when browser_network_mode is set to 'VPC'."
+  type = object({
+    security_groups = optional(list(string))
+    subnets         = optional(list(string))
+  })
+  default = null
+  
+  validation {
+    condition     = var.browser_network_configuration == null || (length(coalesce(var.browser_network_configuration.security_groups, [])) > 0 && length(coalesce(var.browser_network_configuration.subnets, [])) > 0)
+    error_message = "When providing browser_network_configuration, you must include at least one security group and one subnet."
+  }
+}
+
+variable "browser_recording_enabled" {
+  description = "Whether to enable browser session recording to S3."
+  type        = bool
+  default     = false
+}
+
+variable "browser_recording_config" {
+  description = "Configuration for browser session recording when enabled. Bucket name must follow S3 naming conventions (lowercase alphanumeric characters, dots, and hyphens), between 3 and 63 characters, starting and ending with alphanumeric character."
+  type = object({
+    bucket = string
+    prefix = string
+  })
+  default = null
+  
+  validation {
+    condition = var.browser_recording_config == null || can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.browser_recording_config.bucket))
+    error_message = "S3 bucket name must follow naming conventions: lowercase alphanumeric characters, dots and hyphens, 3-63 characters long, starting and ending with alphanumeric character."
+  }
+  
+  validation {
+    condition = var.browser_recording_config == null || var.browser_recording_config.prefix != null
+    error_message = "When providing a recording configuration, the S3 prefix cannot be null."
+  }
+}
+
+variable "browser_tags" {
+  description = "A map of tag keys and values for the agent core browser. Each tag key and value must be between 1 and 256 characters and can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
+  type        = map(string)
+  default     = null
+  
+  validation {
+    condition = var.browser_tags == null || alltrue([
+      for k, v in var.browser_tags : 
+        length(k) >= 1 && length(k) <= 256 && 
+        length(v) >= 1 && length(v) <= 256
+    ])
+    error_message = "Each tag key and value must be between 1 and 256 characters in length."
+  }
+  
+  validation {
+    condition = var.browser_tags == null || alltrue([
+      for k, v in var.browser_tags : 
+        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) && 
+        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
+    ])
+    error_message = "Tag keys and values can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
+  }
+}
+
+# – Agent Core Code Interpreter Custom –
+
+variable "create_code_interpreter" {
+  description = "Whether or not to create an agent core code interpreter custom."
+  type        = bool
+  default     = false
+}
+
+variable "code_interpreter_name" {
+  description = "The name of the agent core code interpreter. Valid characters are a-z, A-Z, 0-9, _ (underscore). The name must start with a letter and can be up to 48 characters long."
+  type        = string
+  default     = "TerraformBedrockAgentCoreCodeInterpreter"
+  
+  validation {
+    condition     = length(var.code_interpreter_name) >= 1 && length(var.code_interpreter_name) <= 48
+    error_message = "The code_interpreter_name must be between 1 and 48 characters in length."
+  }
+  
+  validation {
+    condition     = can(regex("^[a-zA-Z][a-zA-Z0-9_]{0,47}$", var.code_interpreter_name))
+    error_message = "The code_interpreter_name must start with a letter and can only include letters, numbers, and underscores."
+  }
+}
+
+variable "code_interpreter_description" {
+  description = "Description of the agent core code interpreter. Valid characters are a-z, A-Z, 0-9, _ (underscore), - (hyphen) and spaces. The description can have up to 200 characters."
+  type        = string
+  default     = null
+  
+  validation {
+    condition     = var.code_interpreter_description == null || length(var.code_interpreter_description) <= 200
+    error_message = "The code_interpreter_description must be 200 characters or less."
+  }
+  
+  validation {
+    condition     = var.code_interpreter_description == null || can(regex("^[a-zA-Z0-9_\\- ]*$", var.code_interpreter_description))
+    error_message = "The code_interpreter_description can only include letters, numbers, underscores, hyphens, and spaces."
+  }
+}
+
+variable "code_interpreter_role_arn" {
+  description = "Optional external IAM role ARN for the Bedrock agent core code interpreter. If empty, the module will create one internally."
+  type        = string
+  default     = null
+}
+
+variable "code_interpreter_network_mode" {
+  description = "Network mode configuration type for the agent core code interpreter. Valid values: SANDBOX, VPC."
+  type        = string
+  default     = "SANDBOX"
+
+  validation {
+    condition     = contains(["SANDBOX", "VPC"], var.code_interpreter_network_mode)
+    error_message = "The code_interpreter_network_mode must be either SANDBOX or VPC."
+  }
+}
+
+variable "code_interpreter_network_configuration" {
+  description = "VPC network configuration for the agent core code interpreter."
+  type = object({
+    security_groups = optional(list(string))
+    subnets         = optional(list(string))
+  })
+  default = null
+}
+
+variable "code_interpreter_tags" {
+  description = "A map of tag keys and values for the agent core code interpreter. Each tag key and value must be between 1 and 256 characters and can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
+  type        = map(string)
+  default     = null
+  
+  validation {
+    condition = var.code_interpreter_tags == null || alltrue([
+      for k, v in var.code_interpreter_tags : 
+        length(k) >= 1 && length(k) <= 256 && 
+        length(v) >= 1 && length(v) <= 256
+    ])
+    error_message = "Each tag key and value must be between 1 and 256 characters in length."
+  }
+  
+  validation {
+    condition = var.code_interpreter_tags == null || alltrue([
+      for k, v in var.code_interpreter_tags : 
+        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) && 
+        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
+    ])
+    error_message = "Tag keys and values can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
+  }
+}
+
 # – Cognito User Pool (for JWT Authentication Fallback) –
 
 variable "user_pool_name" {

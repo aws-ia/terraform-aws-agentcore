@@ -59,7 +59,7 @@ locals {
   kms_provided = var.memory_encryption_key_arn != null
   
   # Determine if we need to create a KMS policy
-  create_kms_policy = local.create_memory && local.kms_provided
+    create_kms_policy = local.create_memory && local.kms_provided
 }
 
 # Determine if we need to create an IAM role for the memory
@@ -195,8 +195,7 @@ resource "aws_iam_role_policy_attachment" "memory_self_managed_policy" {
 
 # Create policy for KMS access when memory_encryption_key_arn is provided
 resource "aws_iam_policy" "memory_kms_policy" {
-  # Create if KMS is provided, independent of whether we have a custom strategy role
-  count       = local.create_kms_policy ? 1 : 0
+  count       = local.create_memory ? 1 : 0
   name        = "${random_string.solution_prefix.result}-bedrock-agent-memory-kms-policy"
   description = "Policy for Bedrock AgentCore memory KMS access"
 
@@ -227,8 +226,7 @@ resource "aws_iam_policy" "memory_kms_policy" {
 
 # Attach the KMS policy to the memory role when KMS is provided and a role exists
 resource "aws_iam_role_policy_attachment" "memory_kms_policy" {
-  # Only attach if we have both a memory role AND KMS is provided
-  count      = local.create_memory_role && local.create_kms_policy ? 1 : 0
+  count      = local.create_memory ? 1 : 0
   role       = aws_iam_role.memory_role[0].name
   policy_arn = aws_iam_policy.memory_kms_policy[0].arn
 }
@@ -345,7 +343,7 @@ resource "awscc_bedrockagentcore_memory" "agent_memory" {
   description            = var.memory_description
   event_expiry_duration  = var.memory_event_expiry_duration
   encryption_key_arn     = var.memory_encryption_key_arn
-  memory_execution_role_arn = var.memory_execution_role_arn != null ? var.memory_execution_role_arn : (local.create_memory_role ? aws_iam_role.memory_role[0].arn : null)
+  memory_execution_role_arn = var.memory_execution_role_arn != null ? var.memory_execution_role_arn : (local.create_memory_role ? try(aws_iam_role.memory_role[0].arn, null) : null)
   
   # Explicit dependency to avoid race conditions with IAM role creation
   depends_on = [
