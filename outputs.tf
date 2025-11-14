@@ -431,6 +431,45 @@ output "browser_use_policy" {
   value       = local.browser_use_policy_doc
 }
 
+# – Bedrock Agent Core Workload Identity Outputs –
+
+output "workload_identity_id" {
+  description = "ID of the created Bedrock AgentCore Workload Identity"
+  value       = try(awscc_bedrockagentcore_workload_identity.workload_identity[0].id, null)
+}
+
+output "workload_identity_arn" {
+  description = "ARN of the created Bedrock AgentCore Workload Identity"
+  value       = try(awscc_bedrockagentcore_workload_identity.workload_identity[0].workload_identity_arn, null)
+}
+
+output "workload_identity_created_time" {
+  description = "Creation timestamp of the created Bedrock AgentCore Workload Identity"
+  value       = try(awscc_bedrockagentcore_workload_identity.workload_identity[0].created_time, null)
+}
+
+output "workload_identity_last_updated_time" {
+  description = "Last update timestamp of the created Bedrock AgentCore Workload Identity"
+  value       = try(awscc_bedrockagentcore_workload_identity.workload_identity[0].last_updated_time, null)
+}
+
+# – Bedrock Agent Core Gateway Target Outputs –
+
+output "gateway_target_id" {
+  description = "ID of the created Bedrock AgentCore Gateway Target"
+  value       = try(aws_bedrockagentcore_gateway_target.gateway_target[0].target_id, null)
+}
+
+output "gateway_target_name" {
+  description = "Name of the created Bedrock AgentCore Gateway Target"
+  value       = try(aws_bedrockagentcore_gateway_target.gateway_target[0].name, null)
+}
+
+output "gateway_target_gateway_id" {
+  description = "ID of the gateway that this target belongs to"
+  value       = try(aws_bedrockagentcore_gateway_target.gateway_target[0].gateway_identifier, null)
+}
+
 # Code Interpreter permissions outputs - Permission sets
 output "code_interpreter_session_permissions" {
   description = "IAM permissions for managing code interpreter sessions"

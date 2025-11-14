@@ -44,3 +44,19 @@ output "gateway_role_name" {
   description = "Name of the IAM role created for the Bedrock AgentCore Gateway"
   value       = module.bedrock_agent_gateway.gateway_role_name
 }
+
+# Bedrock Agent Core Gateway Target Outputs
+output "gateway_target_id" {
+  description = "ID of the created Bedrock AgentCore Gateway Target"
+  value       = module.bedrock_agent_gateway.gateway_target_id
+}
+
+output "gateway_target_name" {
+  description = "Name of the created Bedrock AgentCore Gateway Target"
+  value       = module.bedrock_agent_gateway.gateway_target_name
+}
+
+output "gateway_target_gateway_id" {
+  description = "ID of the gateway that the target belongs to"
+  value       = module.bedrock_agent_gateway.gateway_target_gateway_id
+}
