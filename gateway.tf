@@ -191,7 +191,10 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
           Action = [
             "bedrock-agentcore:GetResourceApiKey"
           ]
-          Resource = var.apikey_credential_provider_arn != null ? [var.apikey_credential_provider_arn] : []
+          Resource = concat(
+            var.apikey_credential_provider_arn != null ? [var.apikey_credential_provider_arn] : [],
+            var.apikey_secret_arn != null ? [var.apikey_secret_arn] : []
+          )
         },
         {
           Sid    = "GetSecretValueApiKey"
