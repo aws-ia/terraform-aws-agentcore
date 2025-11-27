@@ -152,7 +152,7 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
           ]
           Resource = [
             "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
-            "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${var.gateway_name}-*"
+            "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${random_string.solution_prefix.result}-${var.gateway_name}-*"
           ]
         },
         {
@@ -182,7 +182,7 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
           ]
           Resource = [
             "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
-            "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${var.gateway_name}-*"
+            "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${random_string.solution_prefix.result}-${var.gateway_name}-*"
           ]
         },
         {
