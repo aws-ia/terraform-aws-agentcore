@@ -18,7 +18,7 @@ locals {
 }
 
 resource "random_password" "password" {
-  count = local.create_user_pool && var.user_pool_create_admin ? 1 : 0
+  count            = local.create_user_pool && var.user_pool_create_admin ? 1 : 0
   length           = 16
   special          = true
   override_special = "!#$%&*()-_=+[]{}<>:?"

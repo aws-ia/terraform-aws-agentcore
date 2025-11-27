@@ -154,31 +154,31 @@ variable "memory_strategies" {
   description = "List of memory strategies attached to this memory."
   type = list(object({
     semantic_memory_strategy = optional(object({
-      name = optional(string)
+      name        = optional(string)
       description = optional(string)
-      namespaces = optional(list(string))
+      namespaces  = optional(list(string))
     }))
     summary_memory_strategy = optional(object({
-      name = optional(string)
+      name        = optional(string)
       description = optional(string)
-      namespaces = optional(list(string))
+      namespaces  = optional(list(string))
     }))
     user_preference_memory_strategy = optional(object({
-      name = optional(string)
+      name        = optional(string)
       description = optional(string)
-      namespaces = optional(list(string))
+      namespaces  = optional(list(string))
     }))
     custom_memory_strategy = optional(object({
-      name = optional(string)
+      name        = optional(string)
       description = optional(string)
-      namespaces = optional(list(string))
+      namespaces  = optional(list(string))
       configuration = optional(object({
         self_managed_configuration = optional(object({
           historical_context_window_size = optional(number, 4) # Default to 4 messages
           invocation_configuration = object({
             # Both fields are required when a self-managed configuration is used
             payload_delivery_bucket_name = string
-            topic_arn = string
+            topic_arn                    = string
           })
           trigger_conditions = optional(list(object({
             message_based_trigger = optional(object({
@@ -195,27 +195,27 @@ variable "memory_strategies" {
         semantic_override = optional(object({
           consolidation = optional(object({
             append_to_prompt = optional(string)
-            model_id = optional(string)
+            model_id         = optional(string)
           }))
           extraction = optional(object({
             append_to_prompt = optional(string)
-            model_id = optional(string)
+            model_id         = optional(string)
           }))
         }))
         summary_override = optional(object({
           consolidation = optional(object({
             append_to_prompt = optional(string)
-            model_id = optional(string)
+            model_id         = optional(string)
           }))
         }))
         user_preference_override = optional(object({
           consolidation = optional(object({
             append_to_prompt = optional(string)
-            model_id = optional(string)
+            model_id         = optional(string)
           }))
           extraction = optional(object({
             append_to_prompt = optional(string)
-            model_id = optional(string)
+            model_id         = optional(string)
           }))
         }))
       }))
@@ -279,13 +279,13 @@ variable "gateway_protocol_type" {
 }
 
 variable "gateway_exception_level" {
-  description = "Exception level for the gateway. Valid values: PARTIAL, FULL."
+  description = "Exception level for the gateway. Valid values: DEBUG, INFO, WARN, ERROR."
   type        = string
   default     = null
 
   validation {
-    condition     = var.gateway_exception_level == null || contains(["PARTIAL", "FULL"], var.gateway_exception_level)
-    error_message = "The gateway_exception_level must be either PARTIAL or FULL."
+    condition     = var.gateway_exception_level == null || contains(["DEBUG", "INFO", "WARN", "ERROR"], var.gateway_exception_level)
+    error_message = "The gateway_exception_level must be in [DEBUG, INFO, WARN, FULL]."
   }
 }
 
@@ -410,7 +410,7 @@ variable "browser_name" {
   description = "The name of the agent core browser. Valid characters are a-z, A-Z, 0-9, _ (underscore). The name must start with a letter and can be up to 48 characters long."
   type        = string
   default     = "TerraformBedrockAgentCoreBrowser"
-  
+
   validation {
     condition     = can(regex("^[a-zA-Z][a-zA-Z0-9_]{0,47}$", var.browser_name))
     error_message = "The browser_name must start with a letter and can only include letters, numbers, and underscores, with a maximum length of 48 characters."
@@ -447,7 +447,7 @@ variable "browser_network_configuration" {
     subnets         = optional(list(string))
   })
   default = null
-  
+
   validation {
     condition     = var.browser_network_configuration == null || (length(coalesce(var.browser_network_configuration.security_groups, [])) > 0 && length(coalesce(var.browser_network_configuration.subnets, [])) > 0)
     error_message = "When providing browser_network_configuration, you must include at least one security group and one subnet."
@@ -467,14 +467,14 @@ variable "browser_recording_config" {
     prefix = string
   })
   default = null
-  
+
   validation {
-    condition = var.browser_recording_config == null || can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.browser_recording_config.bucket))
+    condition     = var.browser_recording_config == null || can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.browser_recording_config.bucket))
     error_message = "S3 bucket name must follow naming conventions: lowercase alphanumeric characters, dots and hyphens, 3-63 characters long, starting and ending with alphanumeric character."
   }
-  
+
   validation {
-    condition = var.browser_recording_config == null || var.browser_recording_config.prefix != null
+    condition     = var.browser_recording_config == null || var.browser_recording_config.prefix != null
     error_message = "When providing a recording configuration, the S3 prefix cannot be null."
   }
 }
@@ -483,21 +483,21 @@ variable "browser_tags" {
   description = "A map of tag keys and values for the agent core browser. Each tag key and value must be between 1 and 256 characters and can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
   type        = map(string)
   default     = null
-  
+
   validation {
     condition = var.browser_tags == null || alltrue([
-      for k, v in var.browser_tags : 
-        length(k) >= 1 && length(k) <= 256 && 
-        length(v) >= 1 && length(v) <= 256
+      for k, v in var.browser_tags :
+      length(k) >= 1 && length(k) <= 256 &&
+      length(v) >= 1 && length(v) <= 256
     ])
     error_message = "Each tag key and value must be between 1 and 256 characters in length."
   }
-  
+
   validation {
     condition = var.browser_tags == null || alltrue([
-      for k, v in var.browser_tags : 
-        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) && 
-        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
+      for k, v in var.browser_tags :
+      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) &&
+      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
     ])
     error_message = "Tag keys and values can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
   }
@@ -515,12 +515,12 @@ variable "code_interpreter_name" {
   description = "The name of the agent core code interpreter. Valid characters are a-z, A-Z, 0-9, _ (underscore). The name must start with a letter and can be up to 48 characters long."
   type        = string
   default     = "TerraformBedrockAgentCoreCodeInterpreter"
-  
+
   validation {
     condition     = length(var.code_interpreter_name) >= 1 && length(var.code_interpreter_name) <= 48
     error_message = "The code_interpreter_name must be between 1 and 48 characters in length."
   }
-  
+
   validation {
     condition     = can(regex("^[a-zA-Z][a-zA-Z0-9_]{0,47}$", var.code_interpreter_name))
     error_message = "The code_interpreter_name must start with a letter and can only include letters, numbers, and underscores."
@@ -531,12 +531,12 @@ variable "code_interpreter_description" {
   description = "Description of the agent core code interpreter. Valid characters are a-z, A-Z, 0-9, _ (underscore), - (hyphen) and spaces. The description can have up to 200 characters."
   type        = string
   default     = null
-  
+
   validation {
     condition     = var.code_interpreter_description == null || length(var.code_interpreter_description) <= 200
     error_message = "The code_interpreter_description must be 200 characters or less."
   }
-  
+
   validation {
     condition     = var.code_interpreter_description == null || can(regex("^[a-zA-Z0-9_\\- ]*$", var.code_interpreter_description))
     error_message = "The code_interpreter_description can only include letters, numbers, underscores, hyphens, and spaces."
@@ -573,21 +573,21 @@ variable "code_interpreter_tags" {
   description = "A map of tag keys and values for the agent core code interpreter. Each tag key and value must be between 1 and 256 characters and can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
   type        = map(string)
   default     = null
-  
+
   validation {
     condition = var.code_interpreter_tags == null || alltrue([
-      for k, v in var.code_interpreter_tags : 
-        length(k) >= 1 && length(k) <= 256 && 
-        length(v) >= 1 && length(v) <= 256
+      for k, v in var.code_interpreter_tags :
+      length(k) >= 1 && length(k) <= 256 &&
+      length(v) >= 1 && length(v) <= 256
     ])
     error_message = "Each tag key and value must be between 1 and 256 characters in length."
   }
-  
+
   validation {
     condition = var.code_interpreter_tags == null || alltrue([
-      for k, v in var.code_interpreter_tags : 
-        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) && 
-        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
+      for k, v in var.code_interpreter_tags :
+      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) &&
+      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
     ])
     error_message = "Tag keys and values can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
   }

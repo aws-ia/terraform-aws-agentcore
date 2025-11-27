@@ -32,7 +32,7 @@ data "aws_iam_policy_document" "service_linked_role" {
     condition {
       test     = "StringEquals"
       variable = "iam:AWSServiceName"
-      values   = [
+      values = [
         "runtime-identity.bedrock-agentcore.amazonaws.com"
       ]
     }
@@ -44,7 +44,7 @@ resource "awscc_bedrockagentcore_runtime" "agent_runtime" {
   agent_runtime_name = "${random_string.solution_prefix.result}_${local.sanitized_runtime_name}"
   description        = var.runtime_description
   role_arn           = var.runtime_role_arn != null ? var.runtime_role_arn : aws_iam_role.runtime_role[0].arn
-  
+
   # Explicit dependency to avoid race conditions with IAM role creation
   # Include the time_sleep resource to ensure IAM role propagation
   depends_on = [
