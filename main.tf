@@ -13,27 +13,6 @@ locals {
   create_runtime = var.create_runtime
   # Sanitize runtime name to ensure it follows the regex pattern ^[a-zA-Z][a-zA-Z0-9_]{0,47}$
   sanitized_runtime_name = replace(var.runtime_name, "-", "_")
-  
-  # Define the runtime artifact configuration based on the artifact type
-  container_config = {
-    container_configuration = {
-      container_uri = var.runtime_container_uri
-    }
-  }
-  
-  code_config = {
-    code_configuration = {
-      code = {
-        s3 = {
-          bucket     = var.runtime_code_s3_bucket
-          prefix     = var.runtime_code_s3_prefix
-          version_id = var.runtime_code_s3_version_id
-        }
-      }
-      entry_point = var.runtime_code_entry_point
-      runtime     = var.runtime_code_runtime_type
-    }
-  }
 }
 
 # IAM Policy for creating the Service-Linked Role
