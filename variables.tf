@@ -347,8 +347,8 @@ variable "gateway_exception_level" {
   default     = null
 
   validation {
-    condition     = var.gateway_exception_level == null || contains(["DEBUG", "INFO", "WARN", "ERROR"], var.gateway_exception_level)
-    error_message = "The gateway_exception_level must be in [DEBUG, INFO, WARN, FULL]."
+    condition     = var.gateway_exception_level == null ? true : contains(["DEBUG", "INFO", "WARN", "ERROR"], var.gateway_exception_level)
+    error_message = "The gateway_exception_level must be in [DEBUG, INFO, WARN, ERROR]."
   }
 }
 
