@@ -639,7 +639,7 @@ gateway_tags = {
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.0.7 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 4.0.0 |
-| <a name="requirement_awscc"></a> [awscc](#requirement\_awscc) | >= 0.24.0 |
+| <a name="requirement_awscc"></a> [awscc](#requirement\_awscc) | >= 1.65.0 |
 | <a name="requirement_random"></a> [random](#requirement\_random) | >= 3.6.0 |
 | <a name="requirement_time"></a> [time](#requirement\_time) | >= 0.9.0 |
 
@@ -648,7 +648,7 @@ gateway_tags = {
 | Name | Version |
 |------|---------|
 | <a name="provider_aws"></a> [aws](#provider\_aws) | >= 4.0.0 |
-| <a name="provider_awscc"></a> [awscc](#provider\_awscc) | >= 0.24.0 |
+| <a name="provider_awscc"></a> [awscc](#provider\_awscc) | >= 1.65.0 |
 | <a name="provider_random"></a> [random](#provider\_random) | >= 3.6.0 |
 | <a name="provider_time"></a> [time](#provider\_time) | >= 0.9.0 |
 
@@ -684,7 +684,8 @@ No modules.
 | [awscc_bedrockagentcore_code_interpreter_custom.agent_code_interpreter](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_code_interpreter_custom) | resource |
 | [awscc_bedrockagentcore_gateway.agent_gateway](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_gateway) | resource |
 | [awscc_bedrockagentcore_memory.agent_memory](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_memory) | resource |
-| [awscc_bedrockagentcore_runtime.agent_runtime](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_runtime) | resource |
+| [awscc_bedrockagentcore_runtime.agent_runtime_code](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_runtime) | resource |
+| [awscc_bedrockagentcore_runtime.agent_runtime_container](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_runtime) | resource |
 | [awscc_bedrockagentcore_runtime_endpoint.agent_runtime_endpoint](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_runtime_endpoint) | resource |
 | [random_password.password](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
 | [random_string.solution_prefix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
@@ -749,18 +750,26 @@ No modules.
 | <a name="input_oauth_credential_provider_arn"></a> [oauth\_credential\_provider\_arn](#input\_oauth\_credential\_provider\_arn) | ARN of the OAuth credential provider created with CreateOauth2CredentialProvider. Required when enable\_oauth\_outbound\_auth is true. | `string` | `null` | no |
 | <a name="input_oauth_secret_arn"></a> [oauth\_secret\_arn](#input\_oauth\_secret\_arn) | ARN of the AWS Secrets Manager secret containing the OAuth client credentials. Required when enable\_oauth\_outbound\_auth is true. | `string` | `null` | no |
 | <a name="input_permissions_boundary_arn"></a> [permissions\_boundary\_arn](#input\_permissions\_boundary\_arn) | The ARN of the IAM permission boundary for the role. | `string` | `null` | no |
+| <a name="input_runtime_artifact_type"></a> [runtime\_artifact\_type](#input\_runtime\_artifact\_type) | The type of artifact to use for the agent core runtime. Valid values: container, code. | `string` | `"container"` | no |
 | <a name="input_runtime_authorizer_configuration"></a> [runtime\_authorizer\_configuration](#input\_runtime\_authorizer\_configuration) | Authorizer configuration for the agent core runtime. | <pre>object({<br>    custom_jwt_authorizer = object({<br>      allowed_audience = optional(list(string))<br>      allowed_clients  = optional(list(string))<br>      discovery_url    = string<br>    })<br>  })</pre> | `null` | no |
-| <a name="input_runtime_container_uri"></a> [runtime\_container\_uri](#input\_runtime\_container\_uri) | The ECR URI of the container for the agent core runtime. | `string` | `null` | no |
+| <a name="input_runtime_code_entry_point"></a> [runtime\_code\_entry\_point](#input\_runtime\_code\_entry\_point) | Entry point for the code runtime. Required when runtime\_artifact\_type is set to 'code'. | `list(string)` | `null` | no |
+| <a name="input_runtime_code_runtime_type"></a> [runtime\_code\_runtime\_type](#input\_runtime\_code\_runtime\_type) | Runtime type for the code. Required when runtime\_artifact\_type is set to 'code'. Valid values: PYTHON\_3\_10, PYTHON\_3\_11, PYTHON\_3\_12, PYTHON\_3\_13 | `string` | `null` | no |
+| <a name="input_runtime_code_s3_bucket"></a> [runtime\_code\_s3\_bucket](#input\_runtime\_code\_s3\_bucket) | S3 bucket containing the code package for the agent core runtime. Required when runtime\_artifact\_type is set to 'code'. | `string` | `null` | no |
+| <a name="input_runtime_code_s3_prefix"></a> [runtime\_code\_s3\_prefix](#input\_runtime\_code\_s3\_prefix) | S3 prefix (key) for the code package. Required when runtime\_artifact\_type is set to 'code'. | `string` | `null` | no |
+| <a name="input_runtime_code_s3_version_id"></a> [runtime\_code\_s3\_version\_id](#input\_runtime\_code\_s3\_version\_id) | S3 version ID of the code package. Optional when runtime\_artifact\_type is set to 'code'. | `string` | `null` | no |
+| <a name="input_runtime_container_uri"></a> [runtime\_container\_uri](#input\_runtime\_container\_uri) | The ECR URI of the container for the agent core runtime. Required when runtime\_artifact\_type is set to 'container'. | `string` | `null` | no |
 | <a name="input_runtime_description"></a> [runtime\_description](#input\_runtime\_description) | Description of the agent runtime. | `string` | `null` | no |
 | <a name="input_runtime_endpoint_agent_runtime_id"></a> [runtime\_endpoint\_agent\_runtime\_id](#input\_runtime\_endpoint\_agent\_runtime\_id) | The ID of the agent core runtime associated with the endpoint. If not provided, it will use the ID of the agent runtime created by this module. | `string` | `null` | no |
 | <a name="input_runtime_endpoint_description"></a> [runtime\_endpoint\_description](#input\_runtime\_endpoint\_description) | Description of the agent core runtime endpoint. | `string` | `null` | no |
 | <a name="input_runtime_endpoint_name"></a> [runtime\_endpoint\_name](#input\_runtime\_endpoint\_name) | The name of the agent core runtime endpoint. | `string` | `"TerraformBedrockAgentCoreRuntimeEndpoint"` | no |
 | <a name="input_runtime_endpoint_tags"></a> [runtime\_endpoint\_tags](#input\_runtime\_endpoint\_tags) | A map of tag keys and values for the agent core runtime endpoint. | `map(string)` | `null` | no |
 | <a name="input_runtime_environment_variables"></a> [runtime\_environment\_variables](#input\_runtime\_environment\_variables) | Environment variables for the agent core runtime. | `map(string)` | `null` | no |
+| <a name="input_runtime_lifecycle_configuration"></a> [runtime\_lifecycle\_configuration](#input\_runtime\_lifecycle\_configuration) | Lifecycle configuration for managing runtime sessions. | <pre>object({<br>    idle_runtime_session_timeout = optional(number)<br>    max_lifetime                 = optional(number)<br>  })</pre> | `null` | no |
 | <a name="input_runtime_name"></a> [runtime\_name](#input\_runtime\_name) | The name of the agent core runtime. | `string` | `"TerraformBedrockAgentCoreRuntime"` | no |
 | <a name="input_runtime_network_configuration"></a> [runtime\_network\_configuration](#input\_runtime\_network\_configuration) | VPC network configuration for the agent core runtime. | <pre>object({<br>    security_groups = optional(list(string))<br>    subnets         = optional(list(string))<br>  })</pre> | `null` | no |
 | <a name="input_runtime_network_mode"></a> [runtime\_network\_mode](#input\_runtime\_network\_mode) | Network mode configuration type for the agent core runtime. Valid values: PUBLIC, VPC. | `string` | `"PUBLIC"` | no |
 | <a name="input_runtime_protocol_configuration"></a> [runtime\_protocol\_configuration](#input\_runtime\_protocol\_configuration) | Protocol configuration for the agent core runtime. | `string` | `null` | no |
+| <a name="input_runtime_request_header_configuration"></a> [runtime\_request\_header\_configuration](#input\_runtime\_request\_header\_configuration) | Configuration for HTTP request headers. | <pre>object({<br>    request_header_allowlist = optional(set(string))<br>  })</pre> | `null` | no |
 | <a name="input_runtime_role_arn"></a> [runtime\_role\_arn](#input\_runtime\_role\_arn) | Optional external IAM role ARN for the Bedrock agent core runtime. If empty, the module will create one internally. | `string` | `null` | no |
 | <a name="input_runtime_tags"></a> [runtime\_tags](#input\_runtime\_tags) | A map of tag keys and values for the agent core runtime. | `map(string)` | `null` | no |
 | <a name="input_user_pool_admin_email"></a> [user\_pool\_admin\_email](#input\_user\_pool\_admin\_email) | Email address for the admin user. | `string` | `"admin@example.com"` | no |
