@@ -2,27 +2,27 @@
 
 output "agent_runtime_id" {
   description = "ID of the created Bedrock AgentCore Runtime"
-  value       = try(awscc_bedrockagentcore_runtime.agent_runtime[0].agent_runtime_id, null)
+  value       = local.agent_runtime_id
 }
 
 output "agent_runtime_arn" {
   description = "ARN of the created Bedrock AgentCore Runtime"
-  value       = try(awscc_bedrockagentcore_runtime.agent_runtime[0].agent_runtime_arn, null)
+  value       = var.runtime_artifact_type == "container" ? try(awscc_bedrockagentcore_runtime.agent_runtime_container[0].agent_runtime_arn, null) : try(awscc_bedrockagentcore_runtime.agent_runtime_code[0].agent_runtime_arn, null)
 }
 
 output "agent_runtime_status" {
   description = "Status of the created Bedrock AgentCore Runtime"
-  value       = try(awscc_bedrockagentcore_runtime.agent_runtime[0].status, null)
+  value       = var.runtime_artifact_type == "container" ? try(awscc_bedrockagentcore_runtime.agent_runtime_container[0].status, null) : try(awscc_bedrockagentcore_runtime.agent_runtime_code[0].status, null)
 }
 
 output "agent_runtime_version" {
   description = "Version of the created Bedrock AgentCore Runtime"
-  value       = try(awscc_bedrockagentcore_runtime.agent_runtime[0].agent_runtime_version, null)
+  value       = var.runtime_artifact_type == "container" ? try(awscc_bedrockagentcore_runtime.agent_runtime_container[0].agent_runtime_version, null) : try(awscc_bedrockagentcore_runtime.agent_runtime_code[0].agent_runtime_version, null)
 }
 
 output "agent_runtime_workload_identity_details" {
   description = "Workload identity details of the created Bedrock AgentCore Runtime"
-  value       = try(awscc_bedrockagentcore_runtime.agent_runtime[0].workload_identity_details, null)
+  value       = var.runtime_artifact_type == "container" ? try(awscc_bedrockagentcore_runtime.agent_runtime_container[0].workload_identity_details, null) : try(awscc_bedrockagentcore_runtime.agent_runtime_code[0].workload_identity_details, null)
 }
 
 output "runtime_role_arn" {
