@@ -347,7 +347,7 @@ variable "gateway_exception_level" {
   default     = null
 
   validation {
-    condition     = var.gateway_exception_level == null || contains(["PARTIAL", "FULL"], var.gateway_exception_level)
+    condition     = var.gateway_exception_level == null || try(contains(["PARTIAL", "FULL"], var.gateway_exception_level), true)
     error_message = "The gateway_exception_level must be either PARTIAL or FULL."
   }
 }
@@ -512,7 +512,7 @@ variable "browser_network_configuration" {
   default = null
   
   validation {
-    condition     = var.browser_network_configuration == null || (length(coalesce(var.browser_network_configuration.security_groups, [])) > 0 && length(coalesce(var.browser_network_configuration.subnets, [])) > 0)
+    condition     = var.browser_network_configuration == null || (try(length(coalesce(var.browser_network_configuration.security_groups, [])), 0) > 0 && try(length(coalesce(var.browser_network_configuration.subnets, [])), 0) > 0)
     error_message = "When providing browser_network_configuration, you must include at least one security group and one subnet."
   }
 }
@@ -532,12 +532,12 @@ variable "browser_recording_config" {
   default = null
   
   validation {
-    condition = var.browser_recording_config == null || can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.browser_recording_config.bucket))
+    condition = var.browser_recording_config == null || try(can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.browser_recording_config.bucket)), false)
     error_message = "S3 bucket name must follow naming conventions: lowercase alphanumeric characters, dots and hyphens, 3-63 characters long, starting and ending with alphanumeric character."
   }
   
   validation {
-    condition = var.browser_recording_config == null || var.browser_recording_config.prefix != null
+    condition = var.browser_recording_config == null || try(var.browser_recording_config.prefix != null, true)
     error_message = "When providing a recording configuration, the S3 prefix cannot be null."
   }
 }
@@ -548,20 +548,20 @@ variable "browser_tags" {
   default     = null
   
   validation {
-    condition = var.browser_tags == null || alltrue([
+    condition = var.browser_tags == null || alltrue(try([
       for k, v in var.browser_tags : 
         length(k) >= 1 && length(k) <= 256 && 
         length(v) >= 1 && length(v) <= 256
-    ])
+    ], [true]))
     error_message = "Each tag key and value must be between 1 and 256 characters in length."
   }
   
   validation {
-    condition = var.browser_tags == null || alltrue([
+    condition = var.browser_tags == null || alltrue(try([
       for k, v in var.browser_tags : 
         can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) && 
         can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
-    ])
+    ], [true]))
     error_message = "Tag keys and values can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
   }
 }
@@ -596,12 +596,12 @@ variable "code_interpreter_description" {
   default     = null
   
   validation {
-    condition     = var.code_interpreter_description == null || length(var.code_interpreter_description) <= 200
+    condition     = var.code_interpreter_description == null || try(length(var.code_interpreter_description) <= 200, true)
     error_message = "The code_interpreter_description must be 200 characters or less."
   }
   
   validation {
-    condition     = var.code_interpreter_description == null || can(regex("^[a-zA-Z0-9_\\- ]*$", var.code_interpreter_description))
+    condition     = var.code_interpreter_description == null || try(can(regex("^[a-zA-Z0-9_\\- ]*$", var.code_interpreter_description)), true)
     error_message = "The code_interpreter_description can only include letters, numbers, underscores, hyphens, and spaces."
   }
 }
@@ -638,20 +638,20 @@ variable "code_interpreter_tags" {
   default     = null
   
   validation {
-    condition = var.code_interpreter_tags == null || alltrue([
+    condition = var.code_interpreter_tags == null || alltrue(try([
       for k, v in var.code_interpreter_tags : 
         length(k) >= 1 && length(k) <= 256 && 
         length(v) >= 1 && length(v) <= 256
-    ])
+    ], [true]))
     error_message = "Each tag key and value must be between 1 and 256 characters in length."
   }
   
   validation {
-    condition = var.code_interpreter_tags == null || alltrue([
+    condition = var.code_interpreter_tags == null || alltrue(try([
       for k, v in var.code_interpreter_tags : 
         can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) && 
         can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
-    ])
+    ], [true]))
     error_message = "Tag keys and values can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
   }
 }
