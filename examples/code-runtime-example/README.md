@@ -43,9 +43,9 @@ terraform destroy
 
 This example automatically generates the following files during execution:
 
-- `example_runtime.py`: A simple Python handler for the runtime
-- `requirements.txt`: Dependencies for the Python runtime
-- `agent_runtime_code.zip`: Zipped code package uploaded to S3
+1. `example_runtime.py`: A simple Python handler for the runtime
+2. `requirements.txt`: Dependencies for the Python runtime
+3. `agent_runtime_code.zip`: Zipped code package uploaded to S3
 
 ## Testing the Runtime
 
