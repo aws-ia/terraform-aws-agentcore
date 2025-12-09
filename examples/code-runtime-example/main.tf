@@ -6,6 +6,9 @@ provider "awscc" {
   region = local.region
 }
 
+# Get current account ID
+data "aws_caller_identity" "current" {}
+
 locals {
   region = "us-east-1"
   name   = "bedrock_code_runtime_example"
@@ -17,8 +20,76 @@ resource "random_id" "suffix" {
 
 # Create an S3 bucket for the agent runtime code
 resource "aws_s3_bucket" "agent_runtime_code" {
+  #checkov:skip=CKV2_AWS_62: "Event notifications not required for this example"
+  #checkov:skip=CKV_AWS_18: "Access logging not required for this example"
+  #checkov:skip=CKV_AWS_144: "Cross-region replication not required for this example"
   bucket = "bedrock-agent-runtime-code-${random_id.suffix.hex}"
   force_destroy = true # Allows terraform to delete the bucket even if it contains objects
+}
+
+# Block public access for the S3 bucket
+resource "aws_s3_bucket_public_access_block" "agent_runtime_code_public_access_block" {
+  bucket = aws_s3_bucket.agent_runtime_code.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# Add lifecycle configuration to the S3 bucket
+resource "aws_s3_bucket_lifecycle_configuration" "agent_runtime_code_lifecycle" {
+  bucket = aws_s3_bucket.agent_runtime_code.id
+
+  rule {
+    id     = "cleanup-old-versions"
+    status = "Enabled"
+
+    expiration {
+      days = 90
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+}
+
+# Create KMS key for S3 bucket encryption
+resource "aws_kms_key" "s3_key" {
+  description             = "KMS key for S3 bucket encryption"
+  deletion_window_in_days = 10
+  enable_key_rotation     = true
+  
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Id      = "key-policy-1",
+    Statement = [
+      {
+        Sid    = "Enable IAM User Permissions",
+        Effect = "Allow",
+        Principal = {
+          AWS = "*"
+        },
+        Action   = "kms:*",
+        Resource = "*",
+        Condition = {
+          StringEquals = {
+            "kms:CallerAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_kms_alias" "s3_key_alias" {
+  name          = "alias/s3-bucket-key-${random_id.suffix.hex}"
+  target_key_id = aws_kms_key.s3_key.key_id
 }
 
 # Set bucket versioning for the code bucket
@@ -29,14 +100,16 @@ resource "aws_s3_bucket_versioning" "agent_runtime_code_versioning" {
   }
 }
 
-# Enable server-side encryption for the bucket
+# Enable server-side encryption with KMS for the bucket
 resource "aws_s3_bucket_server_side_encryption_configuration" "agent_runtime_code_encryption" {
   bucket = aws_s3_bucket.agent_runtime_code.id
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+      kms_master_key_id = aws_kms_key.s3_key.arn
+      sse_algorithm     = "aws:kms"
     }
+    bucket_key_enabled = true
   }
 }
 
