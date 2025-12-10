@@ -99,6 +99,70 @@ module "bedrock_agent_gateway" {
   # Provide Lambda function ARNs that the gateway can invoke
   gateway_lambda_function_arns = [aws_lambda_function.example_function.arn]
   
+  # Enable and configure a gateway target using the Lambda function
+  create_gateway_target = true
+  gateway_target_name = "example-lambda-target"
+  gateway_target_description = "Example Lambda function target"
+  gateway_target_credential_provider_type = "GATEWAY_IAM_ROLE"
+  
+  gateway_target_type = "LAMBDA"
+  gateway_target_lambda_config = {
+    lambda_arn = aws_lambda_function.example_function.arn
+    tool_schema_type = "INLINE"
+    inline_schema = {
+      name = "example_tool"
+      description = "Example tool to demonstrate gateway targets"
+      
+      input_schema = {
+        type = "object"
+        description = "Input schema for the example tool"
+        properties = [
+          {
+            name = "query"
+            type = "string"
+            description = "Query to process"
+            required = true
+          },
+          {
+            name = "options"
+            type = "object"
+            nested_properties = [
+              {
+                name = "detailed"
+                type = "boolean"
+                description = "Whether to return detailed results"
+              }
+            ]
+          }
+        ]
+      }
+      
+      output_schema = {
+        type = "object"
+        description = "Output schema for the example tool"
+        properties = [
+          {
+            name = "result"
+            type = "string"
+            description = "Processing result"
+            required = true
+          },
+          {
+            name = "metadata"
+            type = "object"
+            properties = [
+              {
+                name = "timestamp"
+                type = "string"
+                description = "Timestamp of the response"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+  
   # Tags
   gateway_tags = {
     Environment = "example"
@@ -106,5 +170,4 @@ module "bedrock_agent_gateway" {
   }
 }
 
-# Note: Gateway targets are created through the AWS console or AWS CLI
-# The awscc_bedrockagentcore_gateway_target resource is not currently available
+# Now the gateway target is created using the module's aws_bedrockagentcore_gateway_target resource
