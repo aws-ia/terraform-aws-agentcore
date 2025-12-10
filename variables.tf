@@ -656,6 +656,164 @@ variable "code_interpreter_tags" {
   }
 }
 
+# – Agent Core Gateway Target –
+
+variable "create_gateway_target" {
+  description = "Whether or not to create a Bedrock agent core gateway target."
+  type        = bool
+  default     = false
+}
+
+variable "gateway_target_name" {
+  description = "The name of the gateway target."
+  type        = string
+  default     = "TerraformBedrockAgentCoreGatewayTarget"
+}
+
+variable "gateway_target_gateway_id" {
+  description = "Identifier of the gateway that this target belongs to. If not provided, it will use the ID of the gateway created by this module."
+  type        = string
+  default     = null
+}
+
+variable "gateway_target_description" {
+  description = "Description of the gateway target."
+  type        = string
+  default     = null
+}
+
+variable "gateway_target_credential_provider_type" {
+  description = "Type of credential provider to use for the gateway target. Valid values: GATEWAY_IAM_ROLE, API_KEY, OAUTH."
+  type        = string
+  default     = "GATEWAY_IAM_ROLE"
+  
+  validation {
+    condition     = var.gateway_target_credential_provider_type == null || contains(["GATEWAY_IAM_ROLE", "API_KEY", "OAUTH"], var.gateway_target_credential_provider_type)
+    error_message = "The gateway_target_credential_provider_type must be one of GATEWAY_IAM_ROLE, API_KEY, OAUTH, or null."
+  }
+}
+
+variable "gateway_target_api_key_config" {
+  description = "Configuration for API key authentication for the gateway target."
+  type = object({
+    provider_arn              = string
+    credential_location       = optional(string)
+    credential_parameter_name = optional(string)
+    credential_prefix         = optional(string)
+  })
+  default = null
+}
+
+variable "gateway_target_oauth_config" {
+  description = "Configuration for OAuth authentication for the gateway target."
+  type = object({
+    provider_arn      = string
+    scopes            = optional(list(string))
+    custom_parameters = optional(map(string))
+  })
+  default = null
+}
+
+variable "gateway_target_type" {
+  description = "Type of target to create. Valid values: LAMBDA, MCP_SERVER."
+  type        = string
+  default     = "LAMBDA"
+  
+  validation {
+    condition     = var.gateway_target_type == null || contains(["LAMBDA", "MCP_SERVER"], var.gateway_target_type)
+    error_message = "The gateway_target_type must be one of LAMBDA, MCP_SERVER, or null."
+  }
+}
+
+variable "gateway_target_lambda_config" {
+  description = "Configuration for Lambda function target."
+  type = object({
+    lambda_arn       = string
+    tool_schema_type = string # INLINE or S3
+    inline_schema    = optional(object({
+      name        = string
+      description = string
+      input_schema = object({
+        type        = string
+        description = optional(string)
+        properties  = optional(list(object({
+          name             = string
+          type             = string
+          description      = optional(string)
+          required         = optional(bool, false)
+          nested_properties = optional(list(object({
+            name        = string
+            type        = string
+            description = optional(string)
+            required    = optional(bool)
+          })))
+          items = optional(object({
+            type        = string
+            description = optional(string)
+          }))
+        })))
+        items = optional(object({
+          type        = string
+          description = optional(string)
+        }))
+      })
+      output_schema = optional(object({
+        type        = string
+        description = optional(string)
+        properties  = optional(list(object({
+          name        = string
+          type        = string
+          description = optional(string)
+          required    = optional(bool)
+        })))
+        items = optional(object({
+          type        = string
+          description = optional(string)
+        }))
+      }))
+    }))
+    s3_schema = optional(object({
+      uri                     = string
+      bucket_owner_account_id = optional(string)
+    }))
+  })
+  default = null
+}
+
+variable "gateway_target_mcp_server_config" {
+  description = "Configuration for MCP server target."
+  type = object({
+    endpoint = string
+  })
+  default = null
+}
+
+# – Agent Core Workload Identity –
+
+variable "create_workload_identity" {
+  description = "Whether or not to create a Bedrock agent core workload identity."
+  type        = bool
+  default     = false
+}
+
+variable "workload_identity_name" {
+  description = "The name of the workload identity."
+  type        = string
+  default     = "TerraformBedrockAgentCoreWorkloadIdentity"
+}
+
+variable "workload_identity_allowed_resource_oauth_2_return_urls" {
+  description = "The list of allowed OAuth2 return URLs for resources associated with this workload identity."
+  type        = list(string)
+  default     = null
+}
+
+variable "workload_identity_tags" {
+  description = "A map of tag keys and values for the workload identity."
+  type        = map(string)
+  default     = null
+}
+
 # – Cognito User Pool (for JWT Authentication Fallback) –
 
 variable "user_pool_name" {
