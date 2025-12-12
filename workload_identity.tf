@@ -8,10 +8,10 @@ locals {
 
 resource "awscc_bedrockagentcore_workload_identity" "workload_identity" {
   count = local.create_workload_identity ? 1 : 0
-  
-  name                                = "${random_string.solution_prefix.result}_${local.sanitized_workload_identity_name}"
+
+  name                                 = "${random_string.solution_prefix.result}_${local.sanitized_workload_identity_name}"
   allowed_resource_oauth_2_return_urls = var.workload_identity_allowed_resource_oauth_2_return_urls
-  
+
   tags = var.workload_identity_tags != null ? [
     for k, v in var.workload_identity_tags : {
       key   = k
