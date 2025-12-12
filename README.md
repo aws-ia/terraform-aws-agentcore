@@ -44,7 +44,7 @@ This module simplifies the process of:
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Enable Agent Core Runtime
   create_runtime = true
@@ -69,7 +69,7 @@ module "agentcore" {
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Enable Agent Core Runtime
   create_runtime = true
@@ -95,7 +95,7 @@ module "agentcore" {
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Enable Agent Core Runtime with custom IAM role
   create_runtime = true
@@ -116,7 +116,7 @@ Create and configure an MCP gateway:
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Enable Agent Core Gateway
   create_gateway = true
@@ -158,7 +158,7 @@ The module can automatically create a Cognito User Pool to handle JWT authentica
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Enable Agent Core Gateway
   create_gateway = true
@@ -196,7 +196,7 @@ Below you can find how to configure a simple short-term memory (STM) with no lon
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Create a basic memory with default settings, no LTM strategies
   create_memory = true
@@ -217,7 +217,7 @@ resource "aws_kms_key" "memory_encryption_key" {
 
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Create memory with custom encryption
   create_memory = true
@@ -258,7 +258,7 @@ Captures individual preferences, interaction patterns, and personalized settings
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Create memory with built-in strategies
   create_memory = true
@@ -346,7 +346,7 @@ You can customize the namespace (where the memories are stored) by configuring t
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Enable Agent Core Memory
   create_memory = true
@@ -450,7 +450,7 @@ The Browser construct supports the following network modes:
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Enable Agent Core Browser Custom
   create_browser = true
@@ -485,7 +485,7 @@ The Amazon Bedrock AgentCore Gateway Target enables you to define the endpoints 
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # First, create a gateway
   create_gateway = true
@@ -555,7 +555,7 @@ module "agentcore" {
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Create a gateway target with API Key authentication
   create_gateway_target = true
@@ -593,7 +593,7 @@ module "agentcore" {
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Create a gateway target for an MCP server
   create_gateway_target = true
@@ -614,7 +614,7 @@ The Amazon Bedrock AgentCore Workload Identity enables you to manage identity co
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Enable Workload Identity
   create_workload_identity = true
@@ -662,7 +662,7 @@ The Code Interpreter construct supports the following network modes:
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Enable Agent Core Code Interpreter Custom
   create_code_interpreter = true
