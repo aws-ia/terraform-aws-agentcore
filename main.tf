@@ -39,8 +39,9 @@ data "aws_iam_policy_document" "service_linked_role" {
   }
 }
 
-resource "awscc_bedrockagentcore_runtime" "agent_runtime" {
-  count              = local.create_runtime ? 1 : 0
+# Container-based runtime
+resource "awscc_bedrockagentcore_runtime" "agent_runtime_container" {
+  count              = local.create_runtime && var.runtime_artifact_type == "container" ? 1 : 0
   agent_runtime_name = "${random_string.solution_prefix.result}_${local.sanitized_runtime_name}"
   description        = var.runtime_description
   role_arn           = var.runtime_role_arn != null ? var.runtime_role_arn : aws_iam_role.runtime_role[0].arn
@@ -79,8 +80,74 @@ resource "awscc_bedrockagentcore_runtime" "agent_runtime" {
     }
   } : null
 
+  lifecycle_configuration = var.runtime_lifecycle_configuration != null ? {
+    idle_runtime_session_timeout = var.runtime_lifecycle_configuration.idle_runtime_session_timeout
+    max_lifetime                 = var.runtime_lifecycle_configuration.max_lifetime
+  } : null
+
+  request_header_configuration = var.runtime_request_header_configuration != null ? {
+    request_header_allowlist = var.runtime_request_header_configuration.request_header_allowlist
+  } : null
+
   protocol_configuration = var.runtime_protocol_configuration
   tags                   = var.runtime_tags
+}
+
+# Code-based runtime
+resource "awscc_bedrockagentcore_runtime" "agent_runtime_code" {
+  count              = local.create_runtime && var.runtime_artifact_type == "code" ? 1 : 0
+  agent_runtime_name = "${random_string.solution_prefix.result}_${local.sanitized_runtime_name}"
+  description        = var.runtime_description
+  role_arn           = var.runtime_role_arn != null ? var.runtime_role_arn : aws_iam_role.runtime_role[0].arn
+  
+  # Explicit dependency to avoid race conditions with IAM role creation
+  # Include the time_sleep resource to ensure IAM role propagation
+  depends_on = [
+    aws_iam_role.runtime_role,
+    aws_iam_role_policy.runtime_role_policy,
+    aws_iam_role_policy.runtime_slr_policy,
+    time_sleep.iam_role_propagation
+  ]
+
+  agent_runtime_artifact = {
+    code_configuration = {
+      code = {
+        s3 = {
+          bucket     = var.runtime_code_s3_bucket
+          prefix     = var.runtime_code_s3_prefix
+          version_id = var.runtime_code_s3_version_id
+        }
+      }
+      entry_point = var.runtime_code_entry_point
+      runtime     = var.runtime_code_runtime_type
+    }
+  }
+
+  network_configuration = {
+    network_mode = var.runtime_network_mode
+    network_mode_config = var.runtime_network_mode == "VPC" ? {
+      security_groups = var.runtime_network_configuration.security_groups
+      subnets         = var.runtime_network_configuration.subnets
+    } : null
+  }
+
+  environment_variables = var.runtime_environment_variables
+
+  authorizer_configuration = var.runtime_authorizer_configuration != null ? {
+    custom_jwt_authorizer = {
+      allowed_audience = var.runtime_authorizer_configuration.custom_jwt_authorizer.allowed_audience
+      allowed_clients  = var.runtime_authorizer_configuration.custom_jwt_authorizer.allowed_clients
+      discovery_url    = var.runtime_authorizer_configuration.custom_jwt_authorizer.discovery_url
+    }
+  } : null
+
+  protocol_configuration = var.runtime_protocol_configuration
+  tags                   = var.runtime_tags
+}
+
+# Reference for agent runtime ID
+locals {
+  agent_runtime_id = var.runtime_artifact_type == "container" ? try(awscc_bedrockagentcore_runtime.agent_runtime_container[0].agent_runtime_id, null) : try(awscc_bedrockagentcore_runtime.agent_runtime_code[0].agent_runtime_id, null)
 }
 
 # IAM Role for Agent Runtime
@@ -246,6 +313,6 @@ resource "awscc_bedrockagentcore_runtime_endpoint" "agent_runtime_endpoint" {
   count            = local.create_runtime_endpoint ? 1 : 0
   name             = "${random_string.solution_prefix.result}_${local.sanitized_runtime_endpoint_name}"
   description      = var.runtime_endpoint_description
-  agent_runtime_id = var.runtime_endpoint_agent_runtime_id != null ? var.runtime_endpoint_agent_runtime_id : try(awscc_bedrockagentcore_runtime.agent_runtime[0].agent_runtime_id, null)
+  agent_runtime_id = var.runtime_endpoint_agent_runtime_id != null ? var.runtime_endpoint_agent_runtime_id : local.agent_runtime_id
   tags             = var.runtime_endpoint_tags
 }

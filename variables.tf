@@ -24,10 +24,56 @@ variable "runtime_role_arn" {
   default     = null
 }
 
+variable "runtime_artifact_type" {
+  description = "The type of artifact to use for the agent core runtime. Valid values: container, code."
+  type        = string
+  default     = "container"
+
+  validation {
+    condition     = contains(["container", "code"], var.runtime_artifact_type)
+    error_message = "The runtime_artifact_type must be either container or code."
+  }
+}
+
 variable "runtime_container_uri" {
-  description = "The ECR URI of the container for the agent core runtime."
+  description = "The ECR URI of the container for the agent core runtime. Required when runtime_artifact_type is set to 'container'."
   type        = string
   default     = null
+}
+
+variable "runtime_code_s3_bucket" {
+  description = "S3 bucket containing the code package for the agent core runtime. Required when runtime_artifact_type is set to 'code'."
+  type        = string
+  default     = null
+}
+
+variable "runtime_code_s3_prefix" {
+  description = "S3 prefix (key) for the code package. Required when runtime_artifact_type is set to 'code'."
+  type        = string
+  default     = null
+}
+
+variable "runtime_code_s3_version_id" {
+  description = "S3 version ID of the code package. Optional when runtime_artifact_type is set to 'code'."
+  type        = string
+  default     = null
+}
+
+variable "runtime_code_entry_point" {
+  description = "Entry point for the code runtime. Required when runtime_artifact_type is set to 'code'."
+  type        = list(string)
+  default     = null
+}
+
+variable "runtime_code_runtime_type" {
+  description = "Runtime type for the code. Required when runtime_artifact_type is set to 'code'. Valid values: PYTHON_3_10, PYTHON_3_11, PYTHON_3_12, PYTHON_3_13"
+  type        = string
+  default     = null
+  
+  validation {
+    condition     = var.runtime_code_runtime_type == null || contains(["PYTHON_3_10", "PYTHON_3_11", "PYTHON_3_12", "PYTHON_3_13"], var.runtime_code_runtime_type)
+    error_message = "The runtime_code_runtime_type must be one of: PYTHON_3_10, PYTHON_3_11, PYTHON_3_12, PYTHON_3_13."
+  }
 }
 
 variable "runtime_network_mode" {
@@ -72,6 +118,23 @@ variable "runtime_protocol_configuration" {
   description = "Protocol configuration for the agent core runtime."
   type        = string
   default     = null
+}
+
+variable "runtime_lifecycle_configuration" {
+  description = "Lifecycle configuration for managing runtime sessions."
+  type = object({
+    idle_runtime_session_timeout = optional(number)
+    max_lifetime                 = optional(number)
+  })
+  default = null
+}
+
+variable "runtime_request_header_configuration" {
+  description = "Configuration for HTTP request headers."
+  type = object({
+    request_header_allowlist = optional(set(string))
+  })
+  default = null
 }
 
 variable "runtime_tags" {
@@ -284,8 +347,8 @@ variable "gateway_exception_level" {
   default     = null
 
   validation {
-    condition     = var.gateway_exception_level == null || contains(["DEBUG", "INFO", "WARN", "ERROR"], var.gateway_exception_level)
-    error_message = "The gateway_exception_level must be in [DEBUG, INFO, WARN, FULL]."
+    condition     = var.gateway_exception_level == null ? true : contains(["DEBUG", "INFO", "WARN", "ERROR"], var.gateway_exception_level)
+    error_message = "The gateway_exception_level must be in [DEBUG, INFO, WARN, ERROR]."
   }
 }
 
@@ -450,7 +513,7 @@ variable "browser_network_configuration" {
   default = null
 
   validation {
-    condition     = var.browser_network_configuration == null || (length(coalesce(var.browser_network_configuration.security_groups, [])) > 0 && length(coalesce(var.browser_network_configuration.subnets, [])) > 0)
+    condition     = var.browser_network_configuration == null || (try(length(coalesce(var.browser_network_configuration.security_groups, [])), 0) > 0 && try(length(coalesce(var.browser_network_configuration.subnets, [])), 0) > 0)
     error_message = "When providing browser_network_configuration, you must include at least one security group and one subnet."
   }
 }
@@ -470,12 +533,12 @@ variable "browser_recording_config" {
   default = null
 
   validation {
-    condition     = var.browser_recording_config == null || can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.browser_recording_config.bucket))
+    condition = var.browser_recording_config == null || try(can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.browser_recording_config.bucket)), false)
     error_message = "S3 bucket name must follow naming conventions: lowercase alphanumeric characters, dots and hyphens, 3-63 characters long, starting and ending with alphanumeric character."
   }
 
   validation {
-    condition     = var.browser_recording_config == null || var.browser_recording_config.prefix != null
+    condition = var.browser_recording_config == null || try(var.browser_recording_config.prefix != null, true)
     error_message = "When providing a recording configuration, the S3 prefix cannot be null."
   }
 }
@@ -486,20 +549,20 @@ variable "browser_tags" {
   default     = null
 
   validation {
-    condition = var.browser_tags == null || alltrue([
-      for k, v in var.browser_tags :
-      length(k) >= 1 && length(k) <= 256 &&
-      length(v) >= 1 && length(v) <= 256
-    ])
+    condition = var.browser_tags == null || alltrue(try([
+      for k, v in var.browser_tags : 
+        length(k) >= 1 && length(k) <= 256 && 
+        length(v) >= 1 && length(v) <= 256
+    ], [true]))
     error_message = "Each tag key and value must be between 1 and 256 characters in length."
   }
 
   validation {
-    condition = var.browser_tags == null || alltrue([
-      for k, v in var.browser_tags :
-      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) &&
-      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
-    ])
+    condition = var.browser_tags == null || alltrue(try([
+      for k, v in var.browser_tags : 
+        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) && 
+        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
+    ], [true]))
     error_message = "Tag keys and values can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
   }
 }
@@ -534,12 +597,12 @@ variable "code_interpreter_description" {
   default     = null
 
   validation {
-    condition     = var.code_interpreter_description == null || length(var.code_interpreter_description) <= 200
+    condition     = var.code_interpreter_description == null || try(length(var.code_interpreter_description) <= 200, true)
     error_message = "The code_interpreter_description must be 200 characters or less."
   }
 
   validation {
-    condition     = var.code_interpreter_description == null || can(regex("^[a-zA-Z0-9_\\- ]*$", var.code_interpreter_description))
+    condition     = var.code_interpreter_description == null || try(can(regex("^[a-zA-Z0-9_\\- ]*$", var.code_interpreter_description)), true)
     error_message = "The code_interpreter_description can only include letters, numbers, underscores, hyphens, and spaces."
   }
 }
@@ -576,22 +639,180 @@ variable "code_interpreter_tags" {
   default     = null
 
   validation {
-    condition = var.code_interpreter_tags == null || alltrue([
-      for k, v in var.code_interpreter_tags :
-      length(k) >= 1 && length(k) <= 256 &&
-      length(v) >= 1 && length(v) <= 256
-    ])
+    condition = var.code_interpreter_tags == null || alltrue(try([
+      for k, v in var.code_interpreter_tags : 
+        length(k) >= 1 && length(k) <= 256 && 
+        length(v) >= 1 && length(v) <= 256
+    ], [true]))
     error_message = "Each tag key and value must be between 1 and 256 characters in length."
   }
 
   validation {
-    condition = var.code_interpreter_tags == null || alltrue([
-      for k, v in var.code_interpreter_tags :
-      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) &&
-      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
-    ])
+    condition = var.code_interpreter_tags == null || alltrue(try([
+      for k, v in var.code_interpreter_tags : 
+        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) && 
+        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
+    ], [true]))
     error_message = "Tag keys and values can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
   }
+}
+
+# – Agent Core Gateway Target –
+
+variable "create_gateway_target" {
+  description = "Whether or not to create a Bedrock agent core gateway target."
+  type        = bool
+  default     = false
+}
+
+variable "gateway_target_name" {
+  description = "The name of the gateway target."
+  type        = string
+  default     = "TerraformBedrockAgentCoreGatewayTarget"
+}
+
+variable "gateway_target_gateway_id" {
+  description = "Identifier of the gateway that this target belongs to. If not provided, it will use the ID of the gateway created by this module."
+  type        = string
+  default     = null
+}
+
+variable "gateway_target_description" {
+  description = "Description of the gateway target."
+  type        = string
+  default     = null
+}
+
+variable "gateway_target_credential_provider_type" {
+  description = "Type of credential provider to use for the gateway target. Valid values: GATEWAY_IAM_ROLE, API_KEY, OAUTH."
+  type        = string
+  default     = "GATEWAY_IAM_ROLE"
+  
+  validation {
+    condition     = var.gateway_target_credential_provider_type == null || contains(["GATEWAY_IAM_ROLE", "API_KEY", "OAUTH"], var.gateway_target_credential_provider_type)
+    error_message = "The gateway_target_credential_provider_type must be one of GATEWAY_IAM_ROLE, API_KEY, OAUTH, or null."
+  }
+}
+
+variable "gateway_target_api_key_config" {
+  description = "Configuration for API key authentication for the gateway target."
+  type = object({
+    provider_arn              = string
+    credential_location       = optional(string)
+    credential_parameter_name = optional(string)
+    credential_prefix         = optional(string)
+  })
+  default = null
+}
+
+variable "gateway_target_oauth_config" {
+  description = "Configuration for OAuth authentication for the gateway target."
+  type = object({
+    provider_arn      = string
+    scopes            = optional(list(string))
+    custom_parameters = optional(map(string))
+  })
+  default = null
+}
+
+variable "gateway_target_type" {
+  description = "Type of target to create. Valid values: LAMBDA, MCP_SERVER."
+  type        = string
+  default     = "LAMBDA"
+  
+  validation {
+    condition     = var.gateway_target_type == null || contains(["LAMBDA", "MCP_SERVER"], var.gateway_target_type)
+    error_message = "The gateway_target_type must be one of LAMBDA, MCP_SERVER, or null."
+  }
+}
+
+variable "gateway_target_lambda_config" {
+  description = "Configuration for Lambda function target."
+  type = object({
+    lambda_arn       = string
+    tool_schema_type = string # INLINE or S3
+    inline_schema    = optional(object({
+      name        = string
+      description = string
+      input_schema = object({
+        type        = string
+        description = optional(string)
+        properties  = optional(list(object({
+          name             = string
+          type             = string
+          description      = optional(string)
+          required         = optional(bool, false)
+          nested_properties = optional(list(object({
+            name        = string
+            type        = string
+            description = optional(string)
+            required    = optional(bool)
+          })))
+          items = optional(object({
+            type        = string
+            description = optional(string)
+          }))
+        })))
+        items = optional(object({
+          type        = string
+          description = optional(string)
+        }))
+      })
+      output_schema = optional(object({
+        type        = string
+        description = optional(string)
+        properties  = optional(list(object({
+          name        = string
+          type        = string
+          description = optional(string)
+          required    = optional(bool)
+        })))
+        items = optional(object({
+          type        = string
+          description = optional(string)
+        }))
+      }))
+    }))
+    s3_schema = optional(object({
+      uri                     = string
+      bucket_owner_account_id = optional(string)
+    }))
+  })
+  default = null
+}
+
+variable "gateway_target_mcp_server_config" {
+  description = "Configuration for MCP server target."
+  type = object({
+    endpoint = string
+  })
+  default = null
+}
+
+# – Agent Core Workload Identity –
+
+variable "create_workload_identity" {
+  description = "Whether or not to create a Bedrock agent core workload identity."
+  type        = bool
+  default     = false
+}
+
+variable "workload_identity_name" {
+  description = "The name of the workload identity."
+  type        = string
+  default     = "TerraformBedrockAgentCoreWorkloadIdentity"
+}
+
+variable "workload_identity_allowed_resource_oauth_2_return_urls" {
+  description = "The list of allowed OAuth2 return URLs for resources associated with this workload identity."
+  type        = list(string)
+  default     = null
+}
+
+variable "workload_identity_tags" {
+  description = "A map of tag keys and values for the workload identity."
+  type        = map(string)
+  default     = null
 }
 
 # – Cognito User Pool (for JWT Authentication Fallback) –

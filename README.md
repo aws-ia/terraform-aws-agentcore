@@ -44,7 +44,7 @@ This module simplifies the process of:
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Enable Agent Core Runtime
   create_runtime = true
@@ -69,7 +69,7 @@ module "agentcore" {
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Enable Agent Core Runtime
   create_runtime = true
@@ -95,7 +95,7 @@ module "agentcore" {
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Enable Agent Core Runtime with custom IAM role
   create_runtime = true
@@ -116,7 +116,7 @@ Create and configure an MCP gateway:
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Enable Agent Core Gateway
   create_gateway = true
@@ -158,7 +158,7 @@ The module can automatically create a Cognito User Pool to handle JWT authentica
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Enable Agent Core Gateway
   create_gateway = true
@@ -196,7 +196,7 @@ Below you can find how to configure a simple short-term memory (STM) with no lon
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Create a basic memory with default settings, no LTM strategies
   create_memory = true
@@ -217,7 +217,7 @@ resource "aws_kms_key" "memory_encryption_key" {
 
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Create memory with custom encryption
   create_memory = true
@@ -258,7 +258,7 @@ Captures individual preferences, interaction patterns, and personalized settings
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Create memory with built-in strategies
   create_memory = true
@@ -346,7 +346,7 @@ You can customize the namespace (where the memories are stored) by configuring t
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Enable Agent Core Memory
   create_memory = true
@@ -450,7 +450,7 @@ The Browser construct supports the following network modes:
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Enable Agent Core Browser Custom
   create_browser = true
@@ -472,6 +472,160 @@ module "agentcore" {
   # }
 
   browser_tags = {
+    Environment = "production"
+    Project     = "ai-assistants"
+  }
+}
+```
+
+### AgentCore Gateway Target
+
+The Amazon Bedrock AgentCore Gateway Target enables you to define the endpoints and configurations that a gateway can invoke, such as Lambda functions or MCP servers. Gateway targets allow agents to interact with external services through the Model Context Protocol (MCP).
+
+```hcl
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.3"
+
+  # First, create a gateway
+  create_gateway = true
+  gateway_name = "MyGateway"
+
+  # Then create a gateway target for Lambda
+  create_gateway_target = true
+  gateway_target_name = "MyLambdaTarget"
+  gateway_target_description = "Lambda function target for processing requests"
+
+  # Use the gateway's IAM role for authentication
+  gateway_target_credential_provider_type = "GATEWAY_IAM_ROLE"
+
+  # Configure the Lambda target
+  gateway_target_type = "LAMBDA"
+  gateway_target_lambda_config = {
+    lambda_arn = "arn:aws:lambda:us-east-1:123456789012:function:my-function"
+    tool_schema_type = "INLINE"
+    inline_schema = {
+      name        = "process_request"
+      description = "Process incoming requests"
+
+      input_schema = {
+        type        = "object"
+        description = "Request processing schema"
+        properties = [
+          {
+            name        = "message"
+            type        = "string"
+            description = "Message to process"
+            required    = true
+          },
+          {
+            name = "options"
+            type = "object"
+            nested_properties = [
+              {
+                name = "priority"
+                type = "string"
+              }
+            ]
+          }
+        ]
+      }
+
+      output_schema = {
+        type = "object"
+        properties = [
+          {
+            name     = "status"
+            type     = "string"
+            required = true
+          },
+          {
+            name = "result"
+            type = "string"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+#### Gateway Target with API Key Authentication
+
+```hcl
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.3"
+
+  # Create a gateway target with API Key authentication
+  create_gateway_target = true
+  gateway_target_name = "ApiKeyTarget"
+  gateway_target_gateway_id = "your-gateway-id" # If using existing gateway
+
+  gateway_target_credential_provider_type = "API_KEY"
+  gateway_target_api_key_config = {
+    provider_arn = "arn:aws:iam::123456789012:oidc-provider/example.com"
+    credential_location = "HEADER"
+    credential_parameter_name = "X-API-Key"
+    credential_prefix = "Bearer"
+  }
+
+  # Configure Lambda target
+  gateway_target_type = "LAMBDA"
+  gateway_target_lambda_config = {
+    lambda_arn = "arn:aws:lambda:us-east-1:123456789012:function:api-function"
+    tool_schema_type = "INLINE"
+    inline_schema = {
+      name        = "api_tool"
+      description = "External API integration tool"
+
+      input_schema = {
+        type = "string"
+        description = "Simple string input for API calls"
+      }
+    }
+  }
+}
+```
+
+#### Gateway Target with MCP Server
+
+```hcl
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.3"
+
+  # Create a gateway target for an MCP server
+  create_gateway_target = true
+  gateway_target_name = "MCPServerTarget"
+
+  # Configure MCP Server target
+  gateway_target_type = "MCP_SERVER"
+  gateway_target_mcp_server_config = {
+    endpoint = "https://mcp-server.example.com"
+  }
+}
+```
+
+### AgentCore Workload Identity
+
+The Amazon Bedrock AgentCore Workload Identity enables you to manage identity configurations for resources such as AgentCore runtime and AgentCore gateway. Workload identities provide secure access management and OAuth2 integration capabilities for your Bedrock AI applications.
+
+```hcl
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.3"
+
+  # Enable Workload Identity
+  create_workload_identity = true
+  workload_identity_name = "MyWorkloadIdentity"
+  workload_identity_allowed_resource_oauth_2_return_urls = [
+    "https://example.com/oauth2/callback",
+    "https://api.example.com/auth/callback"
+  ]
+
+  # Optional: Add tags
+  workload_identity_tags = {
     Environment = "production"
     Project     = "ai-assistants"
   }
@@ -508,7 +662,7 @@ The Code Interpreter construct supports the following network modes:
 ```hcl
 module "agentcore" {
   source  = "aws-ia/agentcore/aws"
-  version = "0.0.2"
+  version = "0.0.3"
 
   # Enable Agent Core Code Interpreter Custom
   create_code_interpreter = true
@@ -660,6 +814,7 @@ No modules.
 
 | Name | Type |
 |------|------|
+| [aws_bedrockagentcore_gateway_target.gateway_target](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/bedrockagentcore_gateway_target) | resource |
 | [aws_cognito_user.admin](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cognito_user) | resource |
 | [aws_cognito_user_pool.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cognito_user_pool) | resource |
 | [aws_cognito_user_pool_client.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cognito_user_pool_client) | resource |
@@ -684,8 +839,10 @@ No modules.
 | [awscc_bedrockagentcore_code_interpreter_custom.agent_code_interpreter](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_code_interpreter_custom) | resource |
 | [awscc_bedrockagentcore_gateway.agent_gateway](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_gateway) | resource |
 | [awscc_bedrockagentcore_memory.agent_memory](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_memory) | resource |
-| [awscc_bedrockagentcore_runtime.agent_runtime](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_runtime) | resource |
+| [awscc_bedrockagentcore_runtime.agent_runtime_code](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_runtime) | resource |
+| [awscc_bedrockagentcore_runtime.agent_runtime_container](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_runtime) | resource |
 | [awscc_bedrockagentcore_runtime_endpoint.agent_runtime_endpoint](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_runtime_endpoint) | resource |
+| [awscc_bedrockagentcore_workload_identity.workload_identity](https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/bedrockagentcore_workload_identity) | resource |
 | [random_password.password](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
 | [random_string.solution_prefix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
 | [time_sleep.browser_iam_role_propagation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
@@ -720,9 +877,11 @@ No modules.
 | <a name="input_create_browser"></a> [create\_browser](#input\_create\_browser) | Whether or not to create an agent core browser custom. | `bool` | `false` | no |
 | <a name="input_create_code_interpreter"></a> [create\_code\_interpreter](#input\_create\_code\_interpreter) | Whether or not to create an agent core code interpreter custom. | `bool` | `false` | no |
 | <a name="input_create_gateway"></a> [create\_gateway](#input\_create\_gateway) | Whether or not to create an agent core gateway. | `bool` | `false` | no |
+| <a name="input_create_gateway_target"></a> [create\_gateway\_target](#input\_create\_gateway\_target) | Whether or not to create a Bedrock agent core gateway target. | `bool` | `false` | no |
 | <a name="input_create_memory"></a> [create\_memory](#input\_create\_memory) | Whether or not to create an agent core memory. | `bool` | `false` | no |
 | <a name="input_create_runtime"></a> [create\_runtime](#input\_create\_runtime) | Whether or not to create an agent core runtime. | `bool` | `false` | no |
 | <a name="input_create_runtime_endpoint"></a> [create\_runtime\_endpoint](#input\_create\_runtime\_endpoint) | Whether or not to create an agent core runtime endpoint. | `bool` | `false` | no |
+| <a name="input_create_workload_identity"></a> [create\_workload\_identity](#input\_create\_workload\_identity) | Whether or not to create a Bedrock agent core workload identity. | `bool` | `false` | no |
 | <a name="input_enable_apikey_outbound_auth"></a> [enable\_apikey\_outbound\_auth](#input\_enable\_apikey\_outbound\_auth) | Whether to enable outbound authorization with an API key for the gateway. | `bool` | `false` | no |
 | <a name="input_enable_oauth_outbound_auth"></a> [enable\_oauth\_outbound\_auth](#input\_enable\_oauth\_outbound\_auth) | Whether to enable outbound authorization with an OAuth client for the gateway. | `bool` | `false` | no |
 | <a name="input_gateway_allow_create_permissions"></a> [gateway\_allow\_create\_permissions](#input\_gateway\_allow\_create\_permissions) | Whether to allow create permissions for the gateway. | `bool` | `true` | no |
@@ -739,6 +898,15 @@ No modules.
 | <a name="input_gateway_protocol_type"></a> [gateway\_protocol\_type](#input\_gateway\_protocol\_type) | The protocol type for the gateway. Valid value: MCP. | `string` | `"MCP"` | no |
 | <a name="input_gateway_role_arn"></a> [gateway\_role\_arn](#input\_gateway\_role\_arn) | Optional external IAM role ARN for the Bedrock agent core gateway. If empty, the module will create one internally. | `string` | `null` | no |
 | <a name="input_gateway_tags"></a> [gateway\_tags](#input\_gateway\_tags) | A map of tag keys and values for the agent core gateway. | `map(string)` | `null` | no |
+| <a name="input_gateway_target_api_key_config"></a> [gateway\_target\_api\_key\_config](#input\_gateway\_target\_api\_key\_config) | Configuration for API key authentication for the gateway target. | <pre>object({<br/>    provider_arn              = string<br/>    credential_location       = optional(string)<br/>    credential_parameter_name = optional(string)<br/>    credential_prefix         = optional(string)<br/>  })</pre> | `null` | no |
+| <a name="input_gateway_target_credential_provider_type"></a> [gateway\_target\_credential\_provider\_type](#input\_gateway\_target\_credential\_provider\_type) | Type of credential provider to use for the gateway target. Valid values: GATEWAY\_IAM\_ROLE, API\_KEY, OAUTH. | `string` | `"GATEWAY_IAM_ROLE"` | no |
+| <a name="input_gateway_target_description"></a> [gateway\_target\_description](#input\_gateway\_target\_description) | Description of the gateway target. | `string` | `null` | no |
+| <a name="input_gateway_target_gateway_id"></a> [gateway\_target\_gateway\_id](#input\_gateway\_target\_gateway\_id) | Identifier of the gateway that this target belongs to. If not provided, it will use the ID of the gateway created by this module. | `string` | `null` | no |
+| <a name="input_gateway_target_lambda_config"></a> [gateway\_target\_lambda\_config](#input\_gateway\_target\_lambda\_config) | Configuration for Lambda function target. | <pre>object({<br/>    lambda_arn       = string<br/>    tool_schema_type = string # INLINE or S3<br/>    inline_schema    = optional(object({<br/>      name        = string<br/>      description = string<br/>      input_schema = object({<br/>        type        = string<br/>        description = optional(string)<br/>        properties  = optional(list(object({<br/>          name             = string<br/>          type             = string<br/>          description      = optional(string)<br/>          required         = optional(bool, false)<br/>          nested_properties = optional(list(object({<br/>            name        = string<br/>            type        = string<br/>            description = optional(string)<br/>            required    = optional(bool)<br/>          })))<br/>          items = optional(object({<br/>            type        = string<br/>            description = optional(string)<br/>          }))<br/>        })))<br/>        items = optional(object({<br/>          type        = string<br/>          description = optional(string)<br/>        }))<br/>      })<br/>      output_schema = optional(object({<br/>        type        = string<br/>        description = optional(string)<br/>        properties  = optional(list(object({<br/>          name        = string<br/>          type        = string<br/>          description = optional(string)<br/>          required    = optional(bool)<br/>        })))<br/>        items = optional(object({<br/>          type        = string<br/>          description = optional(string)<br/>        }))<br/>      }))<br/>    }))<br/>    s3_schema = optional(object({<br/>      uri                     = string<br/>      bucket_owner_account_id = optional(string)<br/>    }))<br/>  })</pre> | `null` | no |
+| <a name="input_gateway_target_mcp_server_config"></a> [gateway\_target\_mcp\_server\_config](#input\_gateway\_target\_mcp\_server\_config) | Configuration for MCP server target. | <pre>object({<br/>    endpoint = string<br/>  })</pre> | `null` | no |
+| <a name="input_gateway_target_name"></a> [gateway\_target\_name](#input\_gateway\_target\_name) | The name of the gateway target. | `string` | `"TerraformBedrockAgentCoreGatewayTarget"` | no |
+| <a name="input_gateway_target_oauth_config"></a> [gateway\_target\_oauth\_config](#input\_gateway\_target\_oauth\_config) | Configuration for OAuth authentication for the gateway target. | <pre>object({<br/>    provider_arn      = string<br/>    scopes            = optional(list(string))<br/>    custom_parameters = optional(map(string))<br/>  })</pre> | `null` | no |
+| <a name="input_gateway_target_type"></a> [gateway\_target\_type](#input\_gateway\_target\_type) | Type of target to create. Valid values: LAMBDA, MCP\_SERVER. | `string` | `"LAMBDA"` | no |
 | <a name="input_memory_description"></a> [memory\_description](#input\_memory\_description) | Description of the agent core memory. | `string` | `null` | no |
 | <a name="input_memory_encryption_key_arn"></a> [memory\_encryption\_key\_arn](#input\_memory\_encryption\_key\_arn) | The ARN of the KMS key used to encrypt the memory. | `string` | `null` | no |
 | <a name="input_memory_event_expiry_duration"></a> [memory\_event\_expiry\_duration](#input\_memory\_event\_expiry\_duration) | Duration in days until memory events expire. | `number` | `90` | no |
@@ -749,18 +917,26 @@ No modules.
 | <a name="input_oauth_credential_provider_arn"></a> [oauth\_credential\_provider\_arn](#input\_oauth\_credential\_provider\_arn) | ARN of the OAuth credential provider created with CreateOauth2CredentialProvider. Required when enable\_oauth\_outbound\_auth is true. | `string` | `null` | no |
 | <a name="input_oauth_secret_arn"></a> [oauth\_secret\_arn](#input\_oauth\_secret\_arn) | ARN of the AWS Secrets Manager secret containing the OAuth client credentials. Required when enable\_oauth\_outbound\_auth is true. | `string` | `null` | no |
 | <a name="input_permissions_boundary_arn"></a> [permissions\_boundary\_arn](#input\_permissions\_boundary\_arn) | The ARN of the IAM permission boundary for the role. | `string` | `null` | no |
+| <a name="input_runtime_artifact_type"></a> [runtime\_artifact\_type](#input\_runtime\_artifact\_type) | The type of artifact to use for the agent core runtime. Valid values: container, code. | `string` | `"container"` | no |
 | <a name="input_runtime_authorizer_configuration"></a> [runtime\_authorizer\_configuration](#input\_runtime\_authorizer\_configuration) | Authorizer configuration for the agent core runtime. | <pre>object({<br/>    custom_jwt_authorizer = object({<br/>      allowed_audience = optional(list(string))<br/>      allowed_clients  = optional(list(string))<br/>      discovery_url    = string<br/>    })<br/>  })</pre> | `null` | no |
-| <a name="input_runtime_container_uri"></a> [runtime\_container\_uri](#input\_runtime\_container\_uri) | The ECR URI of the container for the agent core runtime. | `string` | `null` | no |
+| <a name="input_runtime_code_entry_point"></a> [runtime\_code\_entry\_point](#input\_runtime\_code\_entry\_point) | Entry point for the code runtime. Required when runtime\_artifact\_type is set to 'code'. | `list(string)` | `null` | no |
+| <a name="input_runtime_code_runtime_type"></a> [runtime\_code\_runtime\_type](#input\_runtime\_code\_runtime\_type) | Runtime type for the code. Required when runtime\_artifact\_type is set to 'code'. Valid values: PYTHON\_3\_10, PYTHON\_3\_11, PYTHON\_3\_12, PYTHON\_3\_13 | `string` | `null` | no |
+| <a name="input_runtime_code_s3_bucket"></a> [runtime\_code\_s3\_bucket](#input\_runtime\_code\_s3\_bucket) | S3 bucket containing the code package for the agent core runtime. Required when runtime\_artifact\_type is set to 'code'. | `string` | `null` | no |
+| <a name="input_runtime_code_s3_prefix"></a> [runtime\_code\_s3\_prefix](#input\_runtime\_code\_s3\_prefix) | S3 prefix (key) for the code package. Required when runtime\_artifact\_type is set to 'code'. | `string` | `null` | no |
+| <a name="input_runtime_code_s3_version_id"></a> [runtime\_code\_s3\_version\_id](#input\_runtime\_code\_s3\_version\_id) | S3 version ID of the code package. Optional when runtime\_artifact\_type is set to 'code'. | `string` | `null` | no |
+| <a name="input_runtime_container_uri"></a> [runtime\_container\_uri](#input\_runtime\_container\_uri) | The ECR URI of the container for the agent core runtime. Required when runtime\_artifact\_type is set to 'container'. | `string` | `null` | no |
 | <a name="input_runtime_description"></a> [runtime\_description](#input\_runtime\_description) | Description of the agent runtime. | `string` | `null` | no |
 | <a name="input_runtime_endpoint_agent_runtime_id"></a> [runtime\_endpoint\_agent\_runtime\_id](#input\_runtime\_endpoint\_agent\_runtime\_id) | The ID of the agent core runtime associated with the endpoint. If not provided, it will use the ID of the agent runtime created by this module. | `string` | `null` | no |
 | <a name="input_runtime_endpoint_description"></a> [runtime\_endpoint\_description](#input\_runtime\_endpoint\_description) | Description of the agent core runtime endpoint. | `string` | `null` | no |
 | <a name="input_runtime_endpoint_name"></a> [runtime\_endpoint\_name](#input\_runtime\_endpoint\_name) | The name of the agent core runtime endpoint. | `string` | `"TerraformBedrockAgentCoreRuntimeEndpoint"` | no |
 | <a name="input_runtime_endpoint_tags"></a> [runtime\_endpoint\_tags](#input\_runtime\_endpoint\_tags) | A map of tag keys and values for the agent core runtime endpoint. | `map(string)` | `null` | no |
 | <a name="input_runtime_environment_variables"></a> [runtime\_environment\_variables](#input\_runtime\_environment\_variables) | Environment variables for the agent core runtime. | `map(string)` | `null` | no |
+| <a name="input_runtime_lifecycle_configuration"></a> [runtime\_lifecycle\_configuration](#input\_runtime\_lifecycle\_configuration) | Lifecycle configuration for managing runtime sessions. | <pre>object({<br/>    idle_runtime_session_timeout = optional(number)<br/>    max_lifetime                 = optional(number)<br/>  })</pre> | `null` | no |
 | <a name="input_runtime_name"></a> [runtime\_name](#input\_runtime\_name) | The name of the agent core runtime. | `string` | `"TerraformBedrockAgentCoreRuntime"` | no |
 | <a name="input_runtime_network_configuration"></a> [runtime\_network\_configuration](#input\_runtime\_network\_configuration) | VPC network configuration for the agent core runtime. | <pre>object({<br/>    security_groups = optional(list(string))<br/>    subnets         = optional(list(string))<br/>  })</pre> | `null` | no |
 | <a name="input_runtime_network_mode"></a> [runtime\_network\_mode](#input\_runtime\_network\_mode) | Network mode configuration type for the agent core runtime. Valid values: PUBLIC, VPC. | `string` | `"PUBLIC"` | no |
 | <a name="input_runtime_protocol_configuration"></a> [runtime\_protocol\_configuration](#input\_runtime\_protocol\_configuration) | Protocol configuration for the agent core runtime. | `string` | `null` | no |
+| <a name="input_runtime_request_header_configuration"></a> [runtime\_request\_header\_configuration](#input\_runtime\_request\_header\_configuration) | Configuration for HTTP request headers. | <pre>object({<br/>    request_header_allowlist = optional(set(string))<br/>  })</pre> | `null` | no |
 | <a name="input_runtime_role_arn"></a> [runtime\_role\_arn](#input\_runtime\_role\_arn) | Optional external IAM role ARN for the Bedrock agent core runtime. If empty, the module will create one internally. | `string` | `null` | no |
 | <a name="input_runtime_tags"></a> [runtime\_tags](#input\_runtime\_tags) | A map of tag keys and values for the agent core runtime. | `map(string)` | `null` | no |
 | <a name="input_user_pool_admin_email"></a> [user\_pool\_admin\_email](#input\_user\_pool\_admin\_email) | Email address for the admin user. | `string` | `"admin@example.com"` | no |
@@ -774,6 +950,9 @@ No modules.
 | <a name="input_user_pool_refresh_token_validity_days"></a> [user\_pool\_refresh\_token\_validity\_days](#input\_user\_pool\_refresh\_token\_validity\_days) | Number of days that refresh tokens are valid for. | `number` | `30` | no |
 | <a name="input_user_pool_tags"></a> [user\_pool\_tags](#input\_user\_pool\_tags) | A map of tag keys and values for the Cognito User Pool. | `map(string)` | `null` | no |
 | <a name="input_user_pool_token_validity_hours"></a> [user\_pool\_token\_validity\_hours](#input\_user\_pool\_token\_validity\_hours) | Number of hours that ID and access tokens are valid for. | `number` | `24` | no |
+| <a name="input_workload_identity_allowed_resource_oauth_2_return_urls"></a> [workload\_identity\_allowed\_resource\_oauth\_2\_return\_urls](#input\_workload\_identity\_allowed\_resource\_oauth\_2\_return\_urls) | The list of allowed OAuth2 return URLs for resources associated with this workload identity. | `list(string)` | `null` | no |
+| <a name="input_workload_identity_name"></a> [workload\_identity\_name](#input\_workload\_identity\_name) | The name of the workload identity. | `string` | `"TerraformBedrockAgentCoreWorkloadIdentity"` | no |
+| <a name="input_workload_identity_tags"></a> [workload\_identity\_tags](#input\_workload\_identity\_tags) | A map of tag keys and values for the workload identity. | `map(string)` | `null` | no |
 
 ## Outputs
 
@@ -848,6 +1027,9 @@ No modules.
 | <a name="output_cognito_domain"></a> [cognito\_domain](#output\_cognito\_domain) | Domain of the Cognito User Pool |
 | <a name="output_gateway_role_arn"></a> [gateway\_role\_arn](#output\_gateway\_role\_arn) | ARN of the IAM role created for the Bedrock AgentCore Gateway |
 | <a name="output_gateway_role_name"></a> [gateway\_role\_name](#output\_gateway\_role\_name) | Name of the IAM role created for the Bedrock AgentCore Gateway |
+| <a name="output_gateway_target_gateway_id"></a> [gateway\_target\_gateway\_id](#output\_gateway\_target\_gateway\_id) | ID of the gateway that this target belongs to |
+| <a name="output_gateway_target_id"></a> [gateway\_target\_id](#output\_gateway\_target\_id) | ID of the created Bedrock AgentCore Gateway Target |
+| <a name="output_gateway_target_name"></a> [gateway\_target\_name](#output\_gateway\_target\_name) | Name of the created Bedrock AgentCore Gateway Target |
 | <a name="output_memory_admin_permissions"></a> [memory\_admin\_permissions](#output\_memory\_admin\_permissions) | IAM permissions for memory administration operations |
 | <a name="output_memory_admin_policy"></a> [memory\_admin\_policy](#output\_memory\_admin\_policy) | Policy document for granting control plane admin permissions |
 | <a name="output_memory_delete_permissions"></a> [memory\_delete\_permissions](#output\_memory\_delete\_permissions) | Combined IAM permissions for deleting from both Short-Term Memory (STM) and Long-Term Memory (LTM) |
@@ -876,4 +1058,8 @@ No modules.
 | <a name="output_user_pool_endpoint"></a> [user\_pool\_endpoint](#output\_user\_pool\_endpoint) | Endpoint of the Cognito User Pool created as JWT authentication fallback |
 | <a name="output_user_pool_id"></a> [user\_pool\_id](#output\_user\_pool\_id) | ID of the Cognito User Pool created as JWT authentication fallback |
 | <a name="output_using_cognito_fallback"></a> [using\_cognito\_fallback](#output\_using\_cognito\_fallback) | Whether the module is using a Cognito User Pool as fallback for JWT authentication |
+| <a name="output_workload_identity_arn"></a> [workload\_identity\_arn](#output\_workload\_identity\_arn) | ARN of the created Bedrock AgentCore Workload Identity |
+| <a name="output_workload_identity_created_time"></a> [workload\_identity\_created\_time](#output\_workload\_identity\_created\_time) | Creation timestamp of the created Bedrock AgentCore Workload Identity |
+| <a name="output_workload_identity_id"></a> [workload\_identity\_id](#output\_workload\_identity\_id) | ID of the created Bedrock AgentCore Workload Identity |
+| <a name="output_workload_identity_last_updated_time"></a> [workload\_identity\_last\_updated\_time](#output\_workload\_identity\_last\_updated\_time) | Last update timestamp of the created Bedrock AgentCore Workload Identity |
 <!-- END_TF_DOCS -->
