@@ -364,7 +364,6 @@ variable "gateway_authorizer_configuration" {
     custom_jwt_authorizer = object({
       allowed_audience = optional(list(string))
       allowed_clients  = optional(list(string))
-      allowed_scopes   = optional(list(string))
       discovery_url    = string
     })
   })
@@ -848,12 +847,6 @@ variable "user_pool_mfa_configuration" {
 
 variable "user_pool_allowed_clients" {
   description = "List of allowed clients for the Cognito User Pool JWT authorizer."
-  type        = list(string)
-  default     = []
-}
-
-variable "user_pool_allowed_scopes" {
-  description = "List of allowed scopes for the Cognito User Pool JWT authorizer."
   type        = list(string)
   default     = []
 }
