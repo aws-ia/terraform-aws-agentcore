@@ -74,6 +74,7 @@ resource "awscc_bedrockagentcore_runtime" "agent_runtime" {
     custom_jwt_authorizer = {
       allowed_audience = var.runtime_authorizer_configuration.custom_jwt_authorizer.allowed_audience
       allowed_clients  = var.runtime_authorizer_configuration.custom_jwt_authorizer.allowed_clients
+      allowed_scopes   = var.runtime_authorizer_configuration.custom_jwt_authorizer.allowed_scopes
       discovery_url    = var.runtime_authorizer_configuration.custom_jwt_authorizer.discovery_url
     }
   } : null
