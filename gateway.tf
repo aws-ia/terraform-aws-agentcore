@@ -28,7 +28,7 @@ locals {
 
   # Lambda function access
   has_lambda_targets = length(var.gateway_lambda_function_arns) > 0
-  
+
   # Gateway target access - needed for gateway targets created by this module
   has_gateway_targets = local.create_gateway && var.create_gateway_target
 }
@@ -251,10 +251,10 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
           Resource = [var.gateway_target_lambda_config.lambda_arn]
         } : null,
         # Add S3 permissions for tool schemas stored in S3
-        (var.gateway_target_type == "LAMBDA" && 
-         var.gateway_target_lambda_config != null && 
-         var.gateway_target_lambda_config.tool_schema_type == "S3" && 
-         var.gateway_target_lambda_config.s3_schema != null) ? {
+        (var.gateway_target_type == "LAMBDA" &&
+          var.gateway_target_lambda_config != null &&
+          var.gateway_target_lambda_config.tool_schema_type == "S3" &&
+          var.gateway_target_lambda_config.s3_schema != null) ? {
           Sid    = "GatewayTargetS3Access"
           Effect = "Allow"
           Action = [
@@ -265,6 +265,6 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
             "arn:aws:s3:::${split("/", replace(var.gateway_target_lambda_config.s3_schema.uri, "s3://", ""))[0]}/*"
           ]
         } : null
-      ] : [])
+    ] : [])
   })
 }

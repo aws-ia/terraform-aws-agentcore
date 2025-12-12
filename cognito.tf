@@ -13,6 +13,7 @@ locals {
       discovery_url    = "https://cognito-idp.${data.aws_region.current.region}.amazonaws.com/${aws_cognito_user_pool.default[0].id}/.well-known/openid-configuration"
       allowed_audience = [aws_cognito_user_pool_client.default[0].id]
       allowed_clients  = length(var.user_pool_allowed_clients) > 0 ? var.user_pool_allowed_clients : [aws_cognito_user_pool_client.default[0].id]
+      allowed_scopes   = length(var.user_pool_allowed_scopes) > 0 ? var.user_pool_allowed_scopes : ["email", "openid", "profile"]
     }
   } : var.gateway_authorizer_configuration
 }

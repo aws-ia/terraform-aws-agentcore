@@ -69,7 +69,7 @@ variable "runtime_code_runtime_type" {
   description = "Runtime type for the code. Required when runtime_artifact_type is set to 'code'. Valid values: PYTHON_3_10, PYTHON_3_11, PYTHON_3_12, PYTHON_3_13"
   type        = string
   default     = null
-  
+
   validation {
     condition     = var.runtime_code_runtime_type == null || contains(["PYTHON_3_10", "PYTHON_3_11", "PYTHON_3_12", "PYTHON_3_13"], var.runtime_code_runtime_type)
     error_message = "The runtime_code_runtime_type must be one of: PYTHON_3_10, PYTHON_3_11, PYTHON_3_12, PYTHON_3_13."
@@ -364,6 +364,7 @@ variable "gateway_authorizer_configuration" {
     custom_jwt_authorizer = object({
       allowed_audience = optional(list(string))
       allowed_clients  = optional(list(string))
+      allowed_scopes   = optional(list(string))
       discovery_url    = string
     })
   })
@@ -532,12 +533,12 @@ variable "browser_recording_config" {
   default = null
 
   validation {
-    condition = var.browser_recording_config == null || try(can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.browser_recording_config.bucket)), false)
+    condition     = var.browser_recording_config == null || try(can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.browser_recording_config.bucket)), false)
     error_message = "S3 bucket name must follow naming conventions: lowercase alphanumeric characters, dots and hyphens, 3-63 characters long, starting and ending with alphanumeric character."
   }
 
   validation {
-    condition = var.browser_recording_config == null || try(var.browser_recording_config.prefix != null, true)
+    condition     = var.browser_recording_config == null || try(var.browser_recording_config.prefix != null, true)
     error_message = "When providing a recording configuration, the S3 prefix cannot be null."
   }
 }
@@ -549,18 +550,18 @@ variable "browser_tags" {
 
   validation {
     condition = var.browser_tags == null || alltrue(try([
-      for k, v in var.browser_tags : 
-        length(k) >= 1 && length(k) <= 256 && 
-        length(v) >= 1 && length(v) <= 256
+      for k, v in var.browser_tags :
+      length(k) >= 1 && length(k) <= 256 &&
+      length(v) >= 1 && length(v) <= 256
     ], [true]))
     error_message = "Each tag key and value must be between 1 and 256 characters in length."
   }
 
   validation {
     condition = var.browser_tags == null || alltrue(try([
-      for k, v in var.browser_tags : 
-        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) && 
-        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
+      for k, v in var.browser_tags :
+      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) &&
+      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
     ], [true]))
     error_message = "Tag keys and values can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
   }
@@ -639,18 +640,18 @@ variable "code_interpreter_tags" {
 
   validation {
     condition = var.code_interpreter_tags == null || alltrue(try([
-      for k, v in var.code_interpreter_tags : 
-        length(k) >= 1 && length(k) <= 256 && 
-        length(v) >= 1 && length(v) <= 256
+      for k, v in var.code_interpreter_tags :
+      length(k) >= 1 && length(k) <= 256 &&
+      length(v) >= 1 && length(v) <= 256
     ], [true]))
     error_message = "Each tag key and value must be between 1 and 256 characters in length."
   }
 
   validation {
     condition = var.code_interpreter_tags == null || alltrue(try([
-      for k, v in var.code_interpreter_tags : 
-        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) && 
-        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
+      for k, v in var.code_interpreter_tags :
+      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) &&
+      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
     ], [true]))
     error_message = "Tag keys and values can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
   }
@@ -686,7 +687,7 @@ variable "gateway_target_credential_provider_type" {
   description = "Type of credential provider to use for the gateway target. Valid values: GATEWAY_IAM_ROLE, API_KEY, OAUTH."
   type        = string
   default     = "GATEWAY_IAM_ROLE"
-  
+
   validation {
     condition     = var.gateway_target_credential_provider_type == null || contains(["GATEWAY_IAM_ROLE", "API_KEY", "OAUTH"], var.gateway_target_credential_provider_type)
     error_message = "The gateway_target_credential_provider_type must be one of GATEWAY_IAM_ROLE, API_KEY, OAUTH, or null."
@@ -718,7 +719,7 @@ variable "gateway_target_type" {
   description = "Type of target to create. Valid values: LAMBDA, MCP_SERVER."
   type        = string
   default     = "LAMBDA"
-  
+
   validation {
     condition     = var.gateway_target_type == null || contains(["LAMBDA", "MCP_SERVER"], var.gateway_target_type)
     error_message = "The gateway_target_type must be one of LAMBDA, MCP_SERVER, or null."
@@ -730,17 +731,17 @@ variable "gateway_target_lambda_config" {
   type = object({
     lambda_arn       = string
     tool_schema_type = string # INLINE or S3
-    inline_schema    = optional(object({
+    inline_schema = optional(object({
       name        = string
       description = string
       input_schema = object({
         type        = string
         description = optional(string)
-        properties  = optional(list(object({
-          name             = string
-          type             = string
-          description      = optional(string)
-          required         = optional(bool, false)
+        properties = optional(list(object({
+          name        = string
+          type        = string
+          description = optional(string)
+          required    = optional(bool, false)
           nested_properties = optional(list(object({
             name        = string
             type        = string
@@ -760,7 +761,7 @@ variable "gateway_target_lambda_config" {
       output_schema = optional(object({
         type        = string
         description = optional(string)
-        properties  = optional(list(object({
+        properties = optional(list(object({
           name        = string
           type        = string
           description = optional(string)
@@ -847,6 +848,12 @@ variable "user_pool_mfa_configuration" {
 
 variable "user_pool_allowed_clients" {
   description = "List of allowed clients for the Cognito User Pool JWT authorizer."
+  type        = list(string)
+  default     = []
+}
+
+variable "user_pool_allowed_scopes" {
+  description = "List of allowed scopes for the Cognito User Pool JWT authorizer."
   type        = list(string)
   default     = []
 }
