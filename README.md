@@ -801,10 +801,10 @@ gateway_tags = {
 
 | Name | Version |
 |------|---------|
-| <a name="provider_aws"></a> [aws](#provider\_aws) | 6.23.0 |
-| <a name="provider_awscc"></a> [awscc](#provider\_awscc) | 1.65.0 |
-| <a name="provider_random"></a> [random](#provider\_random) | 3.7.2 |
-| <a name="provider_time"></a> [time](#provider\_time) | 0.13.1 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | >= 4.0.0 |
+| <a name="provider_awscc"></a> [awscc](#provider\_awscc) | >= 0.24.0 |
+| <a name="provider_random"></a> [random](#provider\_random) | >= 3.6.0 |
+| <a name="provider_time"></a> [time](#provider\_time) | >= 0.9.0 |
 
 ## Modules
 
