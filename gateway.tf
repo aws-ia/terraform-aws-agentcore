@@ -54,6 +54,7 @@ resource "awscc_bedrockagentcore_gateway" "agent_gateway" {
       custom_jwt_authorizer = {
         allowed_audience = var.gateway_authorizer_configuration.custom_jwt_authorizer.allowed_audience
         allowed_clients  = var.gateway_authorizer_configuration.custom_jwt_authorizer.allowed_clients
+        allowed_scopes   = var.gateway_authorizer_configuration.custom_jwt_authorizer.allowed_scopes
         discovery_url    = var.gateway_authorizer_configuration.custom_jwt_authorizer.discovery_url
       }
     } : null

@@ -364,7 +364,6 @@ variable "gateway_authorizer_configuration" {
     custom_jwt_authorizer = object({
       allowed_audience = optional(list(string))
       allowed_clients  = optional(list(string))
-      allowed_scopes   = optional(list(string))
       discovery_url    = string
     })
   })
