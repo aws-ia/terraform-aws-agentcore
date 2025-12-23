@@ -28,7 +28,7 @@ locals {
 
   # Lambda function access
   has_lambda_targets = length(var.gateway_lambda_function_arns) > 0
-  
+
   # Gateway target access - needed for gateway targets created by this module
   has_gateway_targets = local.create_gateway && var.create_gateway_target
 }
@@ -155,7 +155,7 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
           ]
           Resource = [
             "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
-            "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${var.gateway_name}-*"
+            "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${random_string.solution_prefix.result}-${var.gateway_name}-*"
           ]
         },
         {
@@ -185,7 +185,7 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
           ]
           Resource = [
             "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
-            "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${var.gateway_name}-*"
+            "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${random_string.solution_prefix.result}-${var.gateway_name}-*"
           ]
         },
         {
@@ -194,7 +194,15 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
           Action = [
             "bedrock-agentcore:GetResourceApiKey"
           ]
-          Resource = var.apikey_credential_provider_arn != null ? [var.apikey_credential_provider_arn] : []
+          Resource = concat(
+            var.apikey_credential_provider_arn != null ? [var.apikey_credential_provider_arn] : [],
+            var.apikey_secret_arn != null ? [var.apikey_secret_arn] : [],
+            [
+              "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
+              "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${random_string.solution_prefix.result}-${var.gateway_name}-*",
+              "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:token-vault/default"
+            ]
+          )
         },
         {
           Sid    = "GetSecretValueApiKey"
@@ -242,10 +250,10 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
           Resource = [var.gateway_target_lambda_config.lambda_arn]
         } : null,
         # Add S3 permissions for tool schemas stored in S3
-        (var.gateway_target_type == "LAMBDA" && 
-         var.gateway_target_lambda_config != null && 
-         var.gateway_target_lambda_config.tool_schema_type == "S3" && 
-         var.gateway_target_lambda_config.s3_schema != null) ? {
+        (var.gateway_target_type == "LAMBDA" &&
+          var.gateway_target_lambda_config != null &&
+          var.gateway_target_lambda_config.tool_schema_type == "S3" &&
+          var.gateway_target_lambda_config.s3_schema != null) ? {
           Sid    = "GatewayTargetS3Access"
           Effect = "Allow"
           Action = [
@@ -256,6 +264,6 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
             "arn:aws:s3:::${split("/", replace(var.gateway_target_lambda_config.s3_schema.uri, "s3://", ""))[0]}/*"
           ]
         } : null
-      ] : [])
+    ] : [])
   })
 }

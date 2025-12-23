@@ -69,7 +69,7 @@ variable "runtime_code_runtime_type" {
   description = "Runtime type for the code. Required when runtime_artifact_type is set to 'code'. Valid values: PYTHON_3_10, PYTHON_3_11, PYTHON_3_12, PYTHON_3_13"
   type        = string
   default     = null
-  
+
   validation {
     condition     = var.runtime_code_runtime_type == null || contains(["PYTHON_3_10", "PYTHON_3_11", "PYTHON_3_12", "PYTHON_3_13"], var.runtime_code_runtime_type)
     error_message = "The runtime_code_runtime_type must be one of: PYTHON_3_10, PYTHON_3_11, PYTHON_3_12, PYTHON_3_13."
@@ -217,31 +217,31 @@ variable "memory_strategies" {
   description = "List of memory strategies attached to this memory."
   type = list(object({
     semantic_memory_strategy = optional(object({
-      name = optional(string)
+      name        = optional(string)
       description = optional(string)
-      namespaces = optional(list(string))
+      namespaces  = optional(list(string))
     }))
     summary_memory_strategy = optional(object({
-      name = optional(string)
+      name        = optional(string)
       description = optional(string)
-      namespaces = optional(list(string))
+      namespaces  = optional(list(string))
     }))
     user_preference_memory_strategy = optional(object({
-      name = optional(string)
+      name        = optional(string)
       description = optional(string)
-      namespaces = optional(list(string))
+      namespaces  = optional(list(string))
     }))
     custom_memory_strategy = optional(object({
-      name = optional(string)
+      name        = optional(string)
       description = optional(string)
-      namespaces = optional(list(string))
+      namespaces  = optional(list(string))
       configuration = optional(object({
         self_managed_configuration = optional(object({
           historical_context_window_size = optional(number, 4) # Default to 4 messages
           invocation_configuration = object({
             # Both fields are required when a self-managed configuration is used
             payload_delivery_bucket_name = string
-            topic_arn = string
+            topic_arn                    = string
           })
           trigger_conditions = optional(list(object({
             message_based_trigger = optional(object({
@@ -258,27 +258,27 @@ variable "memory_strategies" {
         semantic_override = optional(object({
           consolidation = optional(object({
             append_to_prompt = optional(string)
-            model_id = optional(string)
+            model_id         = optional(string)
           }))
           extraction = optional(object({
             append_to_prompt = optional(string)
-            model_id = optional(string)
+            model_id         = optional(string)
           }))
         }))
         summary_override = optional(object({
           consolidation = optional(object({
             append_to_prompt = optional(string)
-            model_id = optional(string)
+            model_id         = optional(string)
           }))
         }))
         user_preference_override = optional(object({
           consolidation = optional(object({
             append_to_prompt = optional(string)
-            model_id = optional(string)
+            model_id         = optional(string)
           }))
           extraction = optional(object({
             append_to_prompt = optional(string)
-            model_id = optional(string)
+            model_id         = optional(string)
           }))
         }))
       }))
@@ -342,13 +342,13 @@ variable "gateway_protocol_type" {
 }
 
 variable "gateway_exception_level" {
-  description = "Exception level for the gateway. Valid values: PARTIAL, FULL."
+  description = "Exception level for the gateway. Valid values: DEBUG, INFO, WARN, ERROR."
   type        = string
   default     = null
 
   validation {
-    condition     = var.gateway_exception_level == null || try(contains(["PARTIAL", "FULL"], var.gateway_exception_level), true)
-    error_message = "The gateway_exception_level must be either PARTIAL or FULL."
+    condition     = var.gateway_exception_level == null ? true : contains(["DEBUG", "INFO", "WARN", "ERROR"], var.gateway_exception_level)
+    error_message = "The gateway_exception_level must be in [DEBUG, INFO, WARN, ERROR]."
   }
 }
 
@@ -473,7 +473,7 @@ variable "browser_name" {
   description = "The name of the agent core browser. Valid characters are a-z, A-Z, 0-9, _ (underscore). The name must start with a letter and can be up to 48 characters long."
   type        = string
   default     = "TerraformBedrockAgentCoreBrowser"
-  
+
   validation {
     condition     = can(regex("^[a-zA-Z][a-zA-Z0-9_]{0,47}$", var.browser_name))
     error_message = "The browser_name must start with a letter and can only include letters, numbers, and underscores, with a maximum length of 48 characters."
@@ -510,7 +510,7 @@ variable "browser_network_configuration" {
     subnets         = optional(list(string))
   })
   default = null
-  
+
   validation {
     condition     = var.browser_network_configuration == null || (try(length(coalesce(var.browser_network_configuration.security_groups, [])), 0) > 0 && try(length(coalesce(var.browser_network_configuration.subnets, [])), 0) > 0)
     error_message = "When providing browser_network_configuration, you must include at least one security group and one subnet."
@@ -530,14 +530,14 @@ variable "browser_recording_config" {
     prefix = string
   })
   default = null
-  
+
   validation {
-    condition = var.browser_recording_config == null || try(can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.browser_recording_config.bucket)), false)
+    condition     = var.browser_recording_config == null || try(can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.browser_recording_config.bucket)), false)
     error_message = "S3 bucket name must follow naming conventions: lowercase alphanumeric characters, dots and hyphens, 3-63 characters long, starting and ending with alphanumeric character."
   }
-  
+
   validation {
-    condition = var.browser_recording_config == null || try(var.browser_recording_config.prefix != null, true)
+    condition     = var.browser_recording_config == null || try(var.browser_recording_config.prefix != null, true)
     error_message = "When providing a recording configuration, the S3 prefix cannot be null."
   }
 }
@@ -546,21 +546,21 @@ variable "browser_tags" {
   description = "A map of tag keys and values for the agent core browser. Each tag key and value must be between 1 and 256 characters and can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
   type        = map(string)
   default     = null
-  
+
   validation {
     condition = var.browser_tags == null || alltrue(try([
-      for k, v in var.browser_tags : 
-        length(k) >= 1 && length(k) <= 256 && 
-        length(v) >= 1 && length(v) <= 256
+      for k, v in var.browser_tags :
+      length(k) >= 1 && length(k) <= 256 &&
+      length(v) >= 1 && length(v) <= 256
     ], [true]))
     error_message = "Each tag key and value must be between 1 and 256 characters in length."
   }
-  
+
   validation {
     condition = var.browser_tags == null || alltrue(try([
-      for k, v in var.browser_tags : 
-        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) && 
-        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
+      for k, v in var.browser_tags :
+      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) &&
+      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
     ], [true]))
     error_message = "Tag keys and values can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
   }
@@ -578,12 +578,12 @@ variable "code_interpreter_name" {
   description = "The name of the agent core code interpreter. Valid characters are a-z, A-Z, 0-9, _ (underscore). The name must start with a letter and can be up to 48 characters long."
   type        = string
   default     = "TerraformBedrockAgentCoreCodeInterpreter"
-  
+
   validation {
     condition     = length(var.code_interpreter_name) >= 1 && length(var.code_interpreter_name) <= 48
     error_message = "The code_interpreter_name must be between 1 and 48 characters in length."
   }
-  
+
   validation {
     condition     = can(regex("^[a-zA-Z][a-zA-Z0-9_]{0,47}$", var.code_interpreter_name))
     error_message = "The code_interpreter_name must start with a letter and can only include letters, numbers, and underscores."
@@ -594,12 +594,12 @@ variable "code_interpreter_description" {
   description = "Description of the agent core code interpreter. Valid characters are a-z, A-Z, 0-9, _ (underscore), - (hyphen) and spaces. The description can have up to 200 characters."
   type        = string
   default     = null
-  
+
   validation {
     condition     = var.code_interpreter_description == null || try(length(var.code_interpreter_description) <= 200, true)
     error_message = "The code_interpreter_description must be 200 characters or less."
   }
-  
+
   validation {
     condition     = var.code_interpreter_description == null || try(can(regex("^[a-zA-Z0-9_\\- ]*$", var.code_interpreter_description)), true)
     error_message = "The code_interpreter_description can only include letters, numbers, underscores, hyphens, and spaces."
@@ -636,21 +636,21 @@ variable "code_interpreter_tags" {
   description = "A map of tag keys and values for the agent core code interpreter. Each tag key and value must be between 1 and 256 characters and can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
   type        = map(string)
   default     = null
-  
+
   validation {
     condition = var.code_interpreter_tags == null || alltrue(try([
-      for k, v in var.code_interpreter_tags : 
-        length(k) >= 1 && length(k) <= 256 && 
-        length(v) >= 1 && length(v) <= 256
+      for k, v in var.code_interpreter_tags :
+      length(k) >= 1 && length(k) <= 256 &&
+      length(v) >= 1 && length(v) <= 256
     ], [true]))
     error_message = "Each tag key and value must be between 1 and 256 characters in length."
   }
-  
+
   validation {
     condition = var.code_interpreter_tags == null || alltrue(try([
-      for k, v in var.code_interpreter_tags : 
-        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) && 
-        can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
+      for k, v in var.code_interpreter_tags :
+      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) &&
+      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
     ], [true]))
     error_message = "Tag keys and values can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
   }
@@ -686,7 +686,7 @@ variable "gateway_target_credential_provider_type" {
   description = "Type of credential provider to use for the gateway target. Valid values: GATEWAY_IAM_ROLE, API_KEY, OAUTH."
   type        = string
   default     = "GATEWAY_IAM_ROLE"
-  
+
   validation {
     condition     = var.gateway_target_credential_provider_type == null || contains(["GATEWAY_IAM_ROLE", "API_KEY", "OAUTH"], var.gateway_target_credential_provider_type)
     error_message = "The gateway_target_credential_provider_type must be one of GATEWAY_IAM_ROLE, API_KEY, OAUTH, or null."
@@ -718,7 +718,7 @@ variable "gateway_target_type" {
   description = "Type of target to create. Valid values: LAMBDA, MCP_SERVER."
   type        = string
   default     = "LAMBDA"
-  
+
   validation {
     condition     = var.gateway_target_type == null || contains(["LAMBDA", "MCP_SERVER"], var.gateway_target_type)
     error_message = "The gateway_target_type must be one of LAMBDA, MCP_SERVER, or null."
@@ -730,17 +730,17 @@ variable "gateway_target_lambda_config" {
   type = object({
     lambda_arn       = string
     tool_schema_type = string # INLINE or S3
-    inline_schema    = optional(object({
+    inline_schema = optional(object({
       name        = string
       description = string
       input_schema = object({
         type        = string
         description = optional(string)
-        properties  = optional(list(object({
-          name             = string
-          type             = string
-          description      = optional(string)
-          required         = optional(bool, false)
+        properties = optional(list(object({
+          name        = string
+          type        = string
+          description = optional(string)
+          required    = optional(bool, false)
           nested_properties = optional(list(object({
             name        = string
             type        = string
@@ -760,7 +760,7 @@ variable "gateway_target_lambda_config" {
       output_schema = optional(object({
         type        = string
         description = optional(string)
-        properties  = optional(list(object({
+        properties = optional(list(object({
           name        = string
           type        = string
           description = optional(string)
