@@ -176,6 +176,45 @@ In this scenario, the module will:
 3. Set up a User Pool client with the necessary OAuth configuration
 4. Configure the gateway's JWT authorizer to use the User Pool
 
+#### Gateway Interceptor Configuration
+
+You can configure *Interceptors* for your Gateway to intercept `REQUEST` and `RESPONSE` events using Lambda functions. This allows you to implement custom authorization, data transformation, or policy enforcement logic.
+
+The module automatically handles the necessary IAM permissions to allow the Gateway to invoke your interceptor Lambda functions.
+
+```hcl
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.3"
+
+  create_gateway = true
+  gateway_name   = "GatewayWithInterceptor"
+  
+  # Configure interceptors
+  gateway_interceptor_configurations = [
+    {
+      interception_points = ["REQUEST"]
+      interceptor = {
+        lambda = {
+          arn = "arn:aws:lambda:us-east-1:123456789012:function:request-interceptor"
+        }
+      }
+      input_configuration = {
+        pass_request_headers = true
+      }
+    },
+    {
+      interception_points = ["RESPONSE"]
+      interceptor = {
+        lambda = {
+          arn = "arn:aws:lambda:us-east-1:123456789012:function:response-interceptor"
+        }
+      }
+    }
+  ]
+}
+```
+
 ### AgentCore Memory
 
 Memory is a critical component of intelligence. While Large Language Models (LLMs) have impressive capabilities, they lack persistent memory across conversations. Amazon Bedrock AgentCore Memory addresses this limitation by providing a managed service that enables AI agents to maintain context over time, remember important facts, and deliver consistent, personalized experiences.
