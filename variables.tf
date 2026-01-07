@@ -382,6 +382,38 @@ variable "gateway_protocol_configuration" {
   default = null
 }
 
+variable "gateway_interceptor_configurations" {
+  description = "List of interceptor configurations for the gateway. Interceptors allow you to intercept and process requests/responses using Lambda functions. You can configure up to 2 interceptors (one for REQUEST, one for RESPONSE)."
+  type = list(object({
+    interception_points = list(string) # Required: ["REQUEST"] or ["RESPONSE"] or ["REQUEST", "RESPONSE"]
+    interceptor = object({             # Required: Lambda function configuration
+      lambda = object({
+        arn = string # Required: Lambda function ARN
+      })
+    })
+    input_configuration = optional(object({ # Optional: Input configuration
+      pass_request_headers = bool           # Required if block is present
+    }))
+  }))
+  default = []
+
+  validation {
+    condition     = length(var.gateway_interceptor_configurations) <= 2
+    error_message = "You can configure at most 2 interceptor configurations (one for REQUEST, one for RESPONSE)."
+  }
+
+  validation {
+    condition = alltrue([
+      for config in var.gateway_interceptor_configurations :
+      alltrue([
+        for point in config.interception_points :
+        contains(["REQUEST", "RESPONSE"], point)
+      ])
+    ])
+    error_message = "Each interception_points value must be either 'REQUEST' or 'RESPONSE'."
+  }
+}
+
 variable "gateway_tags" {
   description = "A map of tag keys and values for the agent core gateway."
   type        = map(string)

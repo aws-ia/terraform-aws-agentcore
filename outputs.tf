@@ -238,6 +238,11 @@ output "gateway_role_name" {
   value       = try(aws_iam_role.gateway_role[0].name, null)
 }
 
+output "gateway_interceptor_lambda_arns" {
+  description = "List of Lambda function ARNs configured as gateway interceptors"
+  value       = local.interceptor_lambda_arns
+}
+
 # – Cognito User Pool Outputs (for JWT Authentication Fallback) –
 
 output "user_pool_id" {
