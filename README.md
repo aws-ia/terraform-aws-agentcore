@@ -930,6 +930,7 @@ No modules.
 | <a name="input_gateway_cross_account_lambda_permissions"></a> [gateway\_cross\_account\_lambda\_permissions](#input\_gateway\_cross\_account\_lambda\_permissions) | Configuration for cross-account Lambda function access. Required only if Lambda functions are in different AWS accounts. | <pre>list(object({<br>    lambda_function_arn      = string<br>    gateway_service_role_arn = string<br>  }))</pre> | `[]` | no |
 | <a name="input_gateway_description"></a> [gateway\_description](#input\_gateway\_description) | Description of the agent core gateway. | `string` | `null` | no |
 | <a name="input_gateway_exception_level"></a> [gateway\_exception\_level](#input\_gateway\_exception\_level) | Exception level for the gateway. Valid values: DEBUG, INFO, WARN, ERROR. | `string` | `null` | no |
+| <a name="input_gateway_interceptor_configurations"></a> [gateway\_interceptor\_configurations](#input\_gateway\_interceptor\_configurations) | List of interceptor configurations for the gateway. | <pre>list(object({<br>    interception_points = list(string)<br>    interceptor = object({<br>      lambda = object({<br>        arn = string<br>      })<br>    })<br>    input_configuration = optional(object({<br>      pass_request_headers = bool<br>    }))<br>  }))</pre> | `[]` | no |
 | <a name="input_gateway_kms_key_arn"></a> [gateway\_kms\_key\_arn](#input\_gateway\_kms\_key\_arn) | The ARN of the KMS key used to encrypt the gateway. | `string` | `null` | no |
 | <a name="input_gateway_lambda_function_arns"></a> [gateway\_lambda\_function\_arns](#input\_gateway\_lambda\_function\_arns) | List of Lambda function ARNs that the gateway service role should be able to invoke. Required when using Lambda targets. | `list(string)` | `[]` | no |
 | <a name="input_gateway_name"></a> [gateway\_name](#input\_gateway\_name) | The name of the agent core gateway. | `string` | `"TerraformBedrockAgentCoreGateway"` | no |
@@ -1064,6 +1065,7 @@ No modules.
 | <a name="output_code_interpreter_use_policy"></a> [code\_interpreter\_use\_policy](#output\_code\_interpreter\_use\_policy) | Policy document for using code interpreter functionality |
 | <a name="output_cognito_discovery_url"></a> [cognito\_discovery\_url](#output\_cognito\_discovery\_url) | OpenID Connect discovery URL for the Cognito User Pool |
 | <a name="output_cognito_domain"></a> [cognito\_domain](#output\_cognito\_domain) | Domain of the Cognito User Pool |
+| <a name="output_gateway_interceptor_lambda_arns"></a> [gateway\_interceptor\_lambda\_arns](#output\_gateway\_interceptor\_lambda\_arns) | The ARNs of the Lambda functions used in the gateway interceptor configurations |
 | <a name="output_gateway_role_arn"></a> [gateway\_role\_arn](#output\_gateway\_role\_arn) | ARN of the IAM role created for the Bedrock AgentCore Gateway |
 | <a name="output_gateway_role_name"></a> [gateway\_role\_name](#output\_gateway\_role\_name) | Name of the IAM role created for the Bedrock AgentCore Gateway |
 | <a name="output_gateway_target_gateway_id"></a> [gateway\_target\_gateway\_id](#output\_gateway\_target\_gateway\_id) | ID of the gateway that this target belongs to |
