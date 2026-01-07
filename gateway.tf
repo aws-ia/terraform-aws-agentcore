@@ -31,6 +31,13 @@ locals {
 
   # Gateway target access - needed for gateway targets created by this module
   has_gateway_targets = local.create_gateway && var.create_gateway_target
+
+  # Interceptor Lambda access - needed for interceptor configurations
+  has_interceptor_lambdas = length(var.gateway_interceptor_configurations) > 0
+  interceptor_lambda_arns = [
+    for config in var.gateway_interceptor_configurations :
+    config.interceptor.lambda.arn
+  ]
 }
 
 resource "awscc_bedrockagentcore_gateway" "agent_gateway" {
@@ -66,6 +73,21 @@ resource "awscc_bedrockagentcore_gateway" "agent_gateway" {
       supported_versions = var.gateway_protocol_configuration.mcp.supported_versions
     }
   } : null
+
+  # Interceptor configurations for request/response interception
+  interceptor_configurations = length(var.gateway_interceptor_configurations) > 0 ? [
+    for config in var.gateway_interceptor_configurations : {
+      interception_points = config.interception_points
+      interceptor = {
+        lambda = {
+          arn = config.interceptor.lambda.arn
+        }
+      }
+      input_configuration = config.input_configuration != null ? {
+        pass_request_headers = config.input_configuration.pass_request_headers
+      } : null
+    }
+  ] : null
 
   tags = var.gateway_tags
 }
@@ -228,6 +250,17 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
             "lambda:InvokeFunction"
           ]
           Resource = var.gateway_lambda_function_arns
+        }
+      ] : [],
+      # Interceptor Lambda function invocation permissions
+      local.has_interceptor_lambdas ? [
+        {
+          Sid    = "GatewayInterceptorLambdaInvoke"
+          Effect = "Allow"
+          Action = [
+            "lambda:InvokeFunction"
+          ]
+          Resource = local.interceptor_lambda_arns
         }
       ] : [],
       # Additional permissions needed for gateway targets if they're created by this module
