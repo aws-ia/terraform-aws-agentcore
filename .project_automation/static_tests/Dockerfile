@@ -1,7 +1,7 @@
 FROM public.ecr.aws/amazonlinux/amazonlinux:2023
 
-# Install basic tools
-RUN yum install -y wget unzip tar gzip python3 python3-pip curl git && yum clean all
+# Install basic tools (curl-minimal already installed)
+RUN yum install -y wget unzip tar gzip python3 python3-pip git && yum clean all
 
 ENV TERRAFORM_VERSION=1.7.4
 RUN cd /tmp && \
