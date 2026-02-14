@@ -9,6 +9,15 @@ skip-check:
 - CKV_AZURE*
 - CKV2_AZURE*
 - CKV_TF_1 # default to Terraform registry instead of Git
+- CKV_AWS_314 # CodeBuild logging - build output visible in Terraform Actions
+- CKV_AWS_316 # CodeBuild privileged mode - required for Docker builds
+- CKV_AWS_136 # ECR KMS encryption - AES256 sufficient for build artifacts
+- CKV_AWS_51 # ECR mutable tags - required for rebuild workflow
+- CKV_AWS_356 # IAM wildcard resources - Bedrock API requires wildcard
+- CKV_AWS_117 # Lambda VPC - example only
+- CKV_AWS_116 # Lambda DLQ - example only
+- CKV_AWS_272 # Lambda code signing - example only
+- CKV_AWS_115 # Lambda concurrency - example only
 summary-position: bottom
 output: 'cli'
 compact: True

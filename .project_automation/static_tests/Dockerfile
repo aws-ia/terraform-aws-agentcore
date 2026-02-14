@@ -22,7 +22,10 @@ RUN curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/
 
 RUN pip3 install checkov
 
-RUN gem install mdl
+# Install Node.js and markdownlint-cli
+RUN curl -fsSL https://rpm.nodesource.com/setup_18.x | bash - && \
+    yum install -y nodejs && \
+    npm install -g markdownlint-cli
 
 ENV TERRAFORM_DOCS_VERSION=v0.16.0
 RUN wget https://github.com/terraform-docs/terraform-docs/releases/download/${TERRAFORM_DOCS_VERSION}/terraform-docs-${TERRAFORM_DOCS_VERSION}-linux-amd64.tar.gz && \

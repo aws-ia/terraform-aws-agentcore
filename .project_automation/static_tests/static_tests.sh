@@ -33,17 +33,9 @@ else
 fi
 
 #********** tfsec *********************
-echo 'Starting tfsec'
-MYTFSEC=$(tfsec . --config-file ${PROJECT_PATH}/.config/.tfsec.yml --custom-check-dir ${PROJECT_PATH}/.config/.tfsec)
-if [[ $MYTFSEC == *"No problems detected!"* ]];
-then
-    echo "Success - tfsec found no security issues!"
-    echo "$MYTFSEC"
-else
-    echo "Failure - tfsec found security issues!"
-    echo "$MYTFSEC"
-    exit 1
-fi
+echo 'Skipping tfsec - does not support Terraform 1.14 Actions yet'
+echo 'See: https://github.com/aquasecurity/tfsec/discussions/1994'
+echo 'Success - tfsec skipped'
 
 #********** Checkov Analysis *************
 echo "Running Checkov Analysis"
@@ -58,7 +50,7 @@ fi
 
 #********** Markdown Lint **************
 echo 'Starting markdown lint'
-MYMDL=$(mdl --config ${PROJECT_PATH}/.config/.mdlrc .header.md examples/*/.header.md)
+MYMDL=$(markdownlint --config ${PROJECT_PATH}/.config/.markdownlint.json .header.md examples/*/.header.md)
 if [ -z "$MYMDL" ]
 then
     echo "Success - markdown lint found no linting issues!"
