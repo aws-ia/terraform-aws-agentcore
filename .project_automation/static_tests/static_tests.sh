@@ -21,14 +21,17 @@ fi
 
 #********** tflint ********************
 echo 'Starting tflint'
-tflint --init --config ${PROJECT_PATH}/.config/.tflint.hcl
-MYLINT=$(tflint --force --config ${PROJECT_PATH}/.config/.tflint.hcl)
-if [ -z "$MYLINT" ]
+tflint --init --config ${PROJECT_PATH}/.config/.tflint.hcl 2>&1
+if [ $? -ne 0 ]; then
+    echo "Failure - tflint init failed!"
+    exit 1
+fi
+tflint --force --config ${PROJECT_PATH}/.config/.tflint.hcl
+if [ $? -eq 0 ]
 then
     echo "Success - tflint found no linting issues!"
 else
     echo "Failure - tflint found linting issues!"
-    echo "$MYLINT"
     exit 1
 fi
 

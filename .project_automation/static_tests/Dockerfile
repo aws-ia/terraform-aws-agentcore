@@ -9,6 +9,7 @@ RUN cd /tmp && \
     unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip -d /usr/local/bin && chmod 755 /usr/local/bin/terraform
 
 ENV TFLINT_VERSION=v0.45.0
+ENV TFLINT_RULESET_AWS_VERSION=v0.35.0
 
 RUN cd /tmp && \
     wget https://github.com/terraform-linters/tflint/releases/download/${TFLINT_VERSION}/tflint_linux_amd64.zip && \
@@ -16,9 +17,7 @@ RUN cd /tmp && \
 
 RUN mkdir -p ~/.tflint.d/plugins
 
-ENV TFLINT_VERSION=v0.22.1
-
-RUN wget -O /tmp/tflint-ruleset-aws.zip https://github.com/terraform-linters/tflint-ruleset-aws/releases/download/${TFLINT_VERSION}/tflint-ruleset-aws_darwin_arm64.zip \
+RUN wget -O /tmp/tflint-ruleset-aws.zip https://github.com/terraform-linters/tflint-ruleset-aws/releases/download/${TFLINT_RULESET_AWS_VERSION}/tflint-ruleset-aws_linux_amd64.zip \
   && unzip /tmp/tflint-ruleset-aws.zip -d ~/.tflint.d/plugins \
   && rm /tmp/tflint-ruleset-aws.zip
 
