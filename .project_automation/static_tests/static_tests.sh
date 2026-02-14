@@ -65,7 +65,7 @@ fi
 
 #********** Terraform Docs *************
 echo 'Starting terraform-docs'
-terraform-docs --config ${PROJECT_PATH}/.config/.terraform-docs.yaml --lockfile=false ./
+terraform-docs --config ${PROJECT_PATH}/.config/.terraform-docs.yaml --lockfile=false --recursive --recursive-path=examples/ ./
 if [ $? -eq 0 ]
 then
     echo "Success - Terraform Docs generated!"
