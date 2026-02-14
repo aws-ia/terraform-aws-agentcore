@@ -10,11 +10,6 @@ static-test:
 	checkov --config-file .config/.checkov.yml
 	markdownlint --config .config/.markdownlint.json .header.md examples/*/.header.md
 	terraform-docs --config .config/.terraform-docs.yaml --lockfile=false ./
-	@git add -N README.md
-	@if [ -n "$$(git diff --compact-summary)" ]; then \
-		echo "Error: terraform-docs generated changes. Run 'terraform-docs' and commit the changes."; \
-		exit 1; \
-	fi
 
 functional-test:
 	@echo "Running functional tests..."

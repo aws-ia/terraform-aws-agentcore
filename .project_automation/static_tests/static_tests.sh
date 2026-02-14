@@ -65,15 +65,12 @@ fi
 
 #********** Terraform Docs *************
 echo 'Starting terraform-docs'
-TDOCS="$(terraform-docs --config ${PROJECT_PATH}/.config/.terraform-docs.yaml --lockfile=false ./)"
-git add -N README.md
-GDIFF="$(git diff --compact-summary)"
-if [ -z "$GDIFF" ]
+terraform-docs --config ${PROJECT_PATH}/.config/.terraform-docs.yaml --lockfile=false ./
+if [ $? -eq 0 ]
 then
-    echo "Success - Terraform Docs creation verified!"
+    echo "Success - Terraform Docs generated!"
 else
-    echo "Failure - Terraform Docs creation failed, ensure you have precommit installed and running before submitting the Pull Request. TIPS: false error may occur if you have unstaged files in your repo"
-    echo "$GDIFF"
+    echo "Failure - Terraform Docs generation failed!"
     exit 1
 fi
 

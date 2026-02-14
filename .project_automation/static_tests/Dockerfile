@@ -8,7 +8,7 @@ RUN cd /tmp && \
     wget https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip && \
     unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip -d /usr/local/bin && chmod 755 /usr/local/bin/terraform
 
-ENV TFLINT_VERSION=v0.45.0
+ENV TFLINT_VERSION=v0.55.1
 ENV TFLINT_RULESET_AWS_VERSION=v0.35.0
 
 RUN cd /tmp && \
@@ -25,9 +25,8 @@ RUN curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/
 
 RUN pip3 install checkov
 
-# Install Node.js 18.x and markdownlint-cli
-RUN curl -fsSL https://rpm.nodesource.com/setup_18.x | bash - && \
-    yum install -y nodejs && \
+# Install Node.js and markdownlint-cli
+RUN yum install -y nodejs npm && \
     npm install -g markdownlint-cli
 
 ENV TERRAFORM_DOCS_VERSION=v0.16.0
