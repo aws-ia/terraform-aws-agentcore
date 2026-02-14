@@ -1,4 +1,8 @@
-FROM public.ecr.aws/codebuild/amazonlinux2023-x86_64-standard:5.0
+FROM public.ecr.aws/amazonlinux/amazonlinux:2023
+
+# Install basic tools
+RUN yum install -y wget unzip tar gzip python3 python3-pip curl git && yum clean all
+
 ENV TERRAFORM_VERSION=1.7.4
 RUN cd /tmp && \
     wget https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip && \
