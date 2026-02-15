@@ -10,15 +10,15 @@ cd ${PROJECT_PATH}
 
 #********** Terraform Test **********
 
-# Check if any test files exist
-TEST_FILES=$(find ./tests -name "*.tftest.hcl" 2>/dev/null | wc -l)
-if [ "$TEST_FILES" -gt 0 ]; then
-    echo "Found $TEST_FILES test file(s), running tests"
+# Look up the mandatory test file
+MANDATORY_TEST_PATH="./tests/01_mandatory.tftest.hcl"
+if test -f ${MANDATORY_TEST_PATH}; then
+    echo "File ${MANDATORY_TEST_PATH} is found, resuming test"
     # Run Terraform test
     terraform init
     terraform test
 else
-    echo "No .tftest.hcl files found in ./tests directory. You must include at least one test file."
+    echo "File ${MANDATORY_TEST_PATH} not found. You must include at least one test run in file ${MANDATORY_TEST_PATH}"
     (exit 1)
 fi 
 
