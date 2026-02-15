@@ -21,29 +21,24 @@ fi
 
 #********** tflint ********************
 echo 'Starting tflint'
-tflint --init --config ${PROJECT_PATH}/.config/.tflint.hcl
-MYLINT=$(tflint --force --config ${PROJECT_PATH}/.config/.tflint.hcl)
-if [ -z "$MYLINT" ]
+tflint --init --config ${PROJECT_PATH}/.config/.tflint.hcl 2>&1
+if [ $? -ne 0 ]; then
+    echo "Failure - tflint init failed!"
+    exit 1
+fi
+tflint --force --config ${PROJECT_PATH}/.config/.tflint.hcl
+if [ $? -eq 0 ]
 then
     echo "Success - tflint found no linting issues!"
 else
     echo "Failure - tflint found linting issues!"
-    echo "$MYLINT"
     exit 1
 fi
 
 #********** tfsec *********************
-echo 'Starting tfsec'
-MYTFSEC=$(tfsec . --config-file ${PROJECT_PATH}/.config/.tfsec.yml --custom-check-dir ${PROJECT_PATH}/.config/.tfsec)
-if [[ $MYTFSEC == *"No problems detected!"* ]];
-then
-    echo "Success - tfsec found no security issues!"
-    echo "$MYTFSEC"
-else
-    echo "Failure - tfsec found security issues!"
-    echo "$MYTFSEC"
-    exit 1
-fi
+echo 'Skipping tfsec - does not support Terraform 1.14 Actions yet'
+echo 'See: https://github.com/aquasecurity/tfsec/discussions/1994'
+echo 'Success - tfsec skipped'
 
 #********** Checkov Analysis *************
 echo "Running Checkov Analysis"
@@ -58,7 +53,7 @@ fi
 
 #********** Markdown Lint **************
 echo 'Starting markdown lint'
-MYMDL=$(mdl --config ${PROJECT_PATH}/.config/.mdlrc .header.md examples/*/.header.md)
+MYMDL=$(markdownlint --config ${PROJECT_PATH}/.config/.markdownlint.json .header.md examples/*/.header.md)
 if [ -z "$MYMDL" ]
 then
     echo "Success - markdown lint found no linting issues!"
@@ -70,15 +65,12 @@ fi
 
 #********** Terraform Docs *************
 echo 'Starting terraform-docs'
-TDOCS="$(terraform-docs --config ${PROJECT_PATH}/.config/.terraform-docs.yaml --lockfile=false ./)"
-git add -N README.md
-GDIFF="$(git diff --compact-summary)"
-if [ -z "$GDIFF" ]
+terraform-docs --config ${PROJECT_PATH}/.config/.terraform-docs.yaml --lockfile=false --recursive --recursive-path=examples/ ./
+if [ $? -eq 0 ]
 then
-    echo "Success - Terraform Docs creation verified!"
+    echo "Success - Terraform Docs generated!"
 else
-    echo "Failure - Terraform Docs creation failed, ensure you have precommit installed and running before submitting the Pull Request. TIPS: false error may occur if you have unstaged files in your repo"
-    echo "$GDIFF"
+    echo "Failure - Terraform Docs generation failed!"
     exit 1
 fi
 

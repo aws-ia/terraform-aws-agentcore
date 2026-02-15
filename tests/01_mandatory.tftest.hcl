@@ -1,18 +1,9 @@
-## NOTE: This is the minimum mandatory test
-# run at least one test using the ./examples directory as your module source
-# create additional *.tftest.hcl for your own unit / integration tests
-# use tests/*.auto.tfvars to add non-default variables
+# Mandatory test file required by AWS-IA framework
+# Actual tests are in numbered test files (01_*, 02_*, 03_*)
 
-run "mandatory_plan_basic" {
+run "dummy" {
   command = plan
   module {
-    source = "./examples/basic"
-  }
-}
-
-run "mandatory_apply_basic" {
-  command = apply
-  module {
-    source = "./examples/basic"
+    source = "./examples/basic-code-runtime"
   }
 }

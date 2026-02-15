@@ -1,82 +1,38 @@
-# – Bedrock Agent Core Gateway –
+# ═══════════════════════════════════════════════════════════════════════════
+# BEDROCK AGENTCORE GATEWAYS & GATEWAY TARGETS
+# ═══════════════════════════════════════════════════════════════════════════
 
-locals {
-  create_gateway = var.create_gateway
+# ─── Gateways ───
 
-  # Gateway IAM permissions
-  gateway_read_permissions = [
-    "bedrock-agentcore:GetGatewayTarget",
-    "bedrock-agentcore:GetGateway",
-    "bedrock-agentcore:ListGateways",
-    "bedrock-agentcore:ListGatewayTargets"
-  ]
+resource "awscc_bedrockagentcore_gateway" "gateway" {
+  for_each = var.gateways
 
-  gateway_create_permissions = var.gateway_allow_create_permissions ? [
-    "bedrock-agentcore:CreateGateway",
-    "bedrock-agentcore:CreateGatewayTarget"
-  ] : []
+  name             = each.key
+  description      = each.value.description
+  role_arn         = each.value.role_arn != null ? each.value.role_arn : aws_iam_role.gateway[each.key].arn
+  authorizer_type  = each.value.authorizer_type
+  protocol_type    = each.value.protocol_type
+  exception_level  = each.value.exception_level
+  kms_key_arn      = each.value.kms_key_arn
 
-  gateway_update_delete_permissions = var.gateway_allow_update_delete_permissions ? [
-    "bedrock-agentcore:UpdateGateway",
-    "bedrock-agentcore:UpdateGatewayTarget",
-    "bedrock-agentcore:DeleteGateway",
-    "bedrock-agentcore:DeleteGatewayTarget"
-  ] : []
-
-  # Combine permissions
-  gateway_manage_permissions = concat(local.gateway_create_permissions, local.gateway_update_delete_permissions)
-
-  # Lambda function access
-  has_lambda_targets = length(var.gateway_lambda_function_arns) > 0
-
-  # Gateway target access - needed for gateway targets created by this module
-  has_gateway_targets = local.create_gateway && var.create_gateway_target
-
-  # Interceptor Lambda access - needed for interceptor configurations
-  has_interceptor_lambdas = length(var.gateway_interceptor_configurations) > 0
-  interceptor_lambda_arns = [
-    for config in var.gateway_interceptor_configurations :
-    config.interceptor.lambda.arn
-  ]
-}
-
-resource "awscc_bedrockagentcore_gateway" "agent_gateway" {
-  count       = local.create_gateway ? 1 : 0
-  name        = "${random_string.solution_prefix.result}-${var.gateway_name}"
-  description = var.gateway_description
-  role_arn    = var.gateway_role_arn != null ? var.gateway_role_arn : aws_iam_role.gateway_role[0].arn
-
-  # Required fields
-  authorizer_type = var.gateway_authorizer_type
-  protocol_type   = var.gateway_protocol_type
-
-  # Optional fields
-  exception_level = var.gateway_exception_level
-  kms_key_arn     = var.gateway_kms_key_arn
-
-  # Conditional configuration blocks
-  authorizer_configuration = var.gateway_authorizer_type == "CUSTOM_JWT" ? (
-    local.create_user_pool ? local.gateway_authorizer_config :
-    var.gateway_authorizer_configuration != null ? {
-      custom_jwt_authorizer = {
-        allowed_audience = var.gateway_authorizer_configuration.custom_jwt_authorizer.allowed_audience
-        allowed_clients  = var.gateway_authorizer_configuration.custom_jwt_authorizer.allowed_clients
-        discovery_url    = var.gateway_authorizer_configuration.custom_jwt_authorizer.discovery_url
-      }
-    } : null
-  ) : null
-
-  protocol_configuration = var.gateway_protocol_configuration != null ? {
-    mcp = {
-      instructions       = var.gateway_protocol_configuration.mcp.instructions
-      search_type        = var.gateway_protocol_configuration.mcp.search_type
-      supported_versions = var.gateway_protocol_configuration.mcp.supported_versions
+  authorizer_configuration = each.value.authorizer_type == "CUSTOM_JWT" && each.value.authorizer_configuration != null ? {
+    custom_jwt_authorizer = {
+      allowed_audience = each.value.authorizer_configuration.custom_jwt_authorizer.allowed_audience
+      allowed_clients  = each.value.authorizer_configuration.custom_jwt_authorizer.allowed_clients
+      discovery_url    = each.value.authorizer_configuration.custom_jwt_authorizer.discovery_url
     }
   } : null
 
-  # Interceptor configurations for request/response interception
-  interceptor_configurations = length(var.gateway_interceptor_configurations) > 0 ? [
-    for config in var.gateway_interceptor_configurations : {
+  protocol_configuration = each.value.protocol_configuration != null ? {
+    mcp = {
+      instructions       = each.value.protocol_configuration.mcp.instructions
+      search_type        = each.value.protocol_configuration.mcp.search_type
+      supported_versions = each.value.protocol_configuration.mcp.supported_versions
+    }
+  } : null
+
+  interceptor_configurations = length(each.value.interceptor_configurations) > 0 ? [
+    for config in each.value.interceptor_configurations : {
       interception_points = config.interception_points
       interceptor = {
         lambda = {
@@ -89,220 +45,154 @@ resource "awscc_bedrockagentcore_gateway" "agent_gateway" {
     }
   ] : null
 
-  tags = var.gateway_tags
+  tags = merge(local.merged_tags, each.value.tags)
 }
 
-# IAM Role for Agent Gateway
-resource "aws_iam_role" "gateway_role" {
-  count = local.create_gateway && var.gateway_role_arn == null ? 1 : 0
-  name  = "${random_string.solution_prefix.result}-bedrock-agent-gateway-role"
+# ─── Gateway Targets ───
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AssumeRolePolicy"
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "bedrock-agentcore.amazonaws.com"
+resource "aws_bedrockagentcore_gateway_target" "gateway_target" {
+  for_each = var.gateway_targets
+
+  name               = "${var.project_prefix}-${each.key}"
+  gateway_identifier = awscc_bedrockagentcore_gateway.gateway[each.value.gateway_name].gateway_identifier
+  description        = each.value.description
+
+  depends_on = [
+    awscc_bedrockagentcore_gateway.gateway,
+    aws_iam_role_policy.gateway_role_policy,
+    time_sleep.gateway_iam_policy_propagation
+  ]
+
+  dynamic "credential_provider_configuration" {
+    for_each = each.value.credential_provider_type != null ? [1] : []
+
+    content {
+      dynamic "gateway_iam_role" {
+        for_each = each.value.credential_provider_type == "GATEWAY_IAM_ROLE" ? [1] : []
+        content {}
+      }
+
+      dynamic "api_key" {
+        for_each = each.value.credential_provider_type == "API_KEY" && each.value.api_key_config != null ? [1] : []
+        content {
+          provider_arn              = each.value.api_key_config.provider_arn
+          credential_location       = each.value.api_key_config.credential_location
+          credential_parameter_name = each.value.api_key_config.credential_parameter_name
+          credential_prefix         = each.value.api_key_config.credential_prefix
         }
-        Condition = {
-          StringEquals = {
-            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
-          }
-          ArnLike = {
-            "aws:SourceArn" = "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:*"
+      }
+
+      dynamic "oauth" {
+        for_each = each.value.credential_provider_type == "OAUTH" && each.value.oauth_config != null ? [1] : []
+        content {
+          provider_arn      = each.value.oauth_config.provider_arn
+          scopes            = each.value.oauth_config.scopes
+          custom_parameters = each.value.oauth_config.custom_parameters
+        }
+      }
+    }
+  }
+
+  target_configuration {
+    mcp {
+      dynamic "lambda" {
+        for_each = each.value.type == "LAMBDA" && each.value.lambda_config != null ? [1] : []
+        content {
+          lambda_arn = each.value.lambda_config.lambda_arn
+
+          tool_schema {
+            dynamic "inline_payload" {
+              for_each = each.value.lambda_config.tool_schema_type == "INLINE" && each.value.lambda_config.inline_schema != null ? [1] : []
+              content {
+                name        = each.value.lambda_config.inline_schema.name
+                description = each.value.lambda_config.inline_schema.description
+
+                input_schema {
+                  type        = each.value.lambda_config.inline_schema.input_schema.type
+                  description = each.value.lambda_config.inline_schema.input_schema.description
+
+                  dynamic "property" {
+                    for_each = each.value.lambda_config.inline_schema.input_schema.type == "object" && each.value.lambda_config.inline_schema.input_schema.properties != null ? each.value.lambda_config.inline_schema.input_schema.properties : []
+                    content {
+                      name        = property.value.name
+                      type        = property.value.type
+                      description = lookup(property.value, "description", null)
+                      required    = lookup(property.value, "required", false)
+
+                      dynamic "property" {
+                        for_each = property.value.type == "object" && lookup(property.value, "nested_properties", null) != null ? property.value.nested_properties : []
+                        content {
+                          name        = property.value.name
+                          type        = property.value.type
+                          description = lookup(property.value, "description", null)
+                          required    = lookup(property.value, "required", false)
+                        }
+                      }
+
+                      dynamic "items" {
+                        for_each = property.value.type == "array" && lookup(property.value, "items", null) != null ? [property.value.items] : []
+                        content {
+                          type        = items.value.type
+                          description = lookup(items.value, "description", null)
+                        }
+                      }
+                    }
+                  }
+
+                  dynamic "items" {
+                    for_each = each.value.lambda_config.inline_schema.input_schema.type == "array" && lookup(each.value.lambda_config.inline_schema.input_schema, "items", null) != null ? [each.value.lambda_config.inline_schema.input_schema.items] : []
+                    content {
+                      type        = items.value.type
+                      description = lookup(items.value, "description", null)
+                    }
+                  }
+                }
+
+                dynamic "output_schema" {
+                  for_each = each.value.lambda_config.inline_schema.output_schema != null ? [each.value.lambda_config.inline_schema.output_schema] : []
+                  content {
+                    type        = output_schema.value.type
+                    description = lookup(output_schema.value, "description", null)
+
+                    dynamic "property" {
+                      for_each = output_schema.value.type == "object" && lookup(output_schema.value, "properties", null) != null ? output_schema.value.properties : []
+                      content {
+                        name        = property.value.name
+                        type        = property.value.type
+                        description = lookup(property.value, "description", null)
+                        required    = lookup(property.value, "required", false)
+                      }
+                    }
+
+                    dynamic "items" {
+                      for_each = output_schema.value.type == "array" && lookup(output_schema.value, "items", null) != null ? [output_schema.value.items] : []
+                      content {
+                        type        = items.value.type
+                        description = lookup(items.value, "description", null)
+                      }
+                    }
+                  }
+                }
+              }
+            }
+
+            dynamic "s3" {
+              for_each = each.value.lambda_config.tool_schema_type == "S3" && each.value.lambda_config.s3_schema != null ? [1] : []
+              content {
+                uri                     = each.value.lambda_config.s3_schema.uri
+                bucket_owner_account_id = lookup(each.value.lambda_config.s3_schema, "bucket_owner_account_id", null)
+              }
+            }
           }
         }
       }
-    ]
-  })
 
-  permissions_boundary = var.permissions_boundary_arn
-  tags                 = var.gateway_tags
-}
-
-# Resource-based policy for Lambda functions in other accounts
-resource "aws_lambda_permission" "cross_account_lambda_permissions" {
-  for_each = { for idx, perm in var.gateway_cross_account_lambda_permissions : idx => perm }
-
-  function_name = each.value.lambda_function_arn
-  action        = "lambda:InvokeFunction"
-  principal     = each.value.gateway_service_role_arn
-  statement_id  = "LambdaAllowGatewayServiceRole-${each.key}"
-  source_arn    = try(awscc_bedrockagentcore_gateway.agent_gateway[0].gateway_arn, null)
-
-  depends_on = [
-    awscc_bedrockagentcore_gateway.agent_gateway
-  ]
-}
-
-# IAM Policy for Agent Gateway
-resource "aws_iam_role_policy" "gateway_role_policy" {
-  count = local.create_gateway && var.gateway_role_arn == null ? 1 : 0
-  name  = "${random_string.solution_prefix.result}-bedrock-agent-gateway-policy"
-  role  = aws_iam_role.gateway_role[0].name
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = concat(
-      # Only include KMS permission when gateway_kms_key_arn is not null
-      var.gateway_kms_key_arn != null ? [{
-        Effect = "Allow"
-        Action = [
-          "kms:Decrypt"
-        ]
-        Resource = [var.gateway_kms_key_arn]
-      }] : [],
-      [{
-        Sid      = "GatewayReadPermissions"
-        Effect   = "Allow"
-        Action   = local.gateway_read_permissions
-        Resource = "*"
-      }],
-      length(local.gateway_manage_permissions) > 0 ? [{
-        Sid      = "GatewayManagePermissions"
-        Effect   = "Allow"
-        Action   = local.gateway_manage_permissions
-        Resource = "*"
-      }] : [],
-      # Outbound OAuth permissions
-      var.enable_oauth_outbound_auth ? [
-        {
-          Sid    = "GetWorkloadAccessToken"
-          Effect = "Allow"
-          Action = [
-            "bedrock-agentcore:GetWorkloadAccessToken"
-          ]
-          Resource = [
-            "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
-            "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${random_string.solution_prefix.result}-${var.gateway_name}-*"
-          ]
-        },
-        {
-          Sid    = "GetResourceOauth2Token"
-          Effect = "Allow"
-          Action = [
-            "bedrock-agentcore:GetResourceOauth2Token"
-          ]
-          Resource = concat(var.oauth_credential_provider_arn != null ? [var.oauth_credential_provider_arn] : [],
-            [
-              "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
-              "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${random_string.solution_prefix.result}-${var.gateway_name}-*",
-              "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:token-vault/default"
-            ]
-          )
-        },
-        {
-          Sid    = "GetSecretValueOauth"
-          Effect = "Allow"
-          Action = [
-            "secretsmanager:GetSecretValue"
-          ]
-          Resource = var.oauth_secret_arn != null ? [var.oauth_secret_arn] : []
+      dynamic "mcp_server" {
+        for_each = each.value.type == "MCP_SERVER" && each.value.mcp_server_config != null ? [1] : []
+        content {
+          endpoint = each.value.mcp_server_config.endpoint
         }
-      ] : [],
-      # Outbound API Key permissions
-      var.enable_apikey_outbound_auth ? [
-        {
-          Sid    = "GetWorkloadAccessTokenApiKey"
-          Effect = "Allow"
-          Action = [
-            "bedrock-agentcore:GetWorkloadAccessToken"
-          ]
-          Resource = [
-            "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
-            "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${random_string.solution_prefix.result}-${var.gateway_name}-*"
-          ]
-        },
-        {
-          Sid    = "GetResourceApiKey"
-          Effect = "Allow"
-          Action = [
-            "bedrock-agentcore:GetResourceApiKey"
-          ]
-          Resource = concat(
-            var.apikey_credential_provider_arn != null ? [var.apikey_credential_provider_arn] : [],
-            var.apikey_secret_arn != null ? [var.apikey_secret_arn] : [],
-            [
-              "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
-              "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${random_string.solution_prefix.result}-${var.gateway_name}-*",
-              "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:token-vault/default"
-            ]
-          )
-        },
-        {
-          Sid    = "GetSecretValueApiKey"
-          Effect = "Allow"
-          Action = [
-            "secretsmanager:GetSecretValue"
-          ]
-          Resource = var.apikey_secret_arn != null ? [var.apikey_secret_arn] : []
-        }
-      ] : [],
-      # Lambda function invocation permissions
-      local.has_lambda_targets ? [
-        {
-          Sid    = "AmazonBedrockAgentCoreGatewayLambdaProd"
-          Effect = "Allow"
-          Action = [
-            "lambda:InvokeFunction"
-          ]
-          Resource = var.gateway_lambda_function_arns
-        }
-      ] : [],
-      # Interceptor Lambda function invocation permissions
-      local.has_interceptor_lambdas ? [
-        {
-          Sid    = "GatewayInterceptorLambdaInvoke"
-          Effect = "Allow"
-          Action = [
-            "lambda:InvokeFunction"
-          ]
-          Resource = local.interceptor_lambda_arns
-        }
-      ] : [],
-      # Additional permissions needed for gateway targets if they're created by this module
-      local.has_gateway_targets ? [
-        {
-          Sid    = "GatewayTargetOperations"
-          Effect = "Allow"
-          Action = [
-            "bedrock-agentcore:CreateGatewayTarget",
-            "bedrock-agentcore:DeleteGatewayTarget",
-            "bedrock-agentcore:GetGatewayTarget",
-            "bedrock-agentcore:UpdateGatewayTarget",
-            "bedrock-agentcore:ListGatewayTargets"
-          ]
-          Resource = [
-            "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:gateway/*"
-          ]
-        },
-        # Additional permissions for Lambda targets if using LAMBDA target type with gateway_target
-        var.gateway_target_type == "LAMBDA" && var.gateway_target_lambda_config != null ? {
-          Sid    = "GatewayTargetLambdaInvoke"
-          Effect = "Allow"
-          Action = [
-            "lambda:InvokeFunction"
-          ]
-          Resource = [var.gateway_target_lambda_config.lambda_arn]
-        } : null,
-        # Add S3 permissions for tool schemas stored in S3
-        (var.gateway_target_type == "LAMBDA" &&
-          var.gateway_target_lambda_config != null &&
-          var.gateway_target_lambda_config.tool_schema_type == "S3" &&
-          var.gateway_target_lambda_config.s3_schema != null) ? {
-          Sid    = "GatewayTargetS3Access"
-          Effect = "Allow"
-          Action = [
-            "s3:GetObject",
-            "s3:GetObjectVersion"
-          ]
-          Resource = [
-            "arn:aws:s3:::${split("/", replace(var.gateway_target_lambda_config.s3_schema.uri, "s3://", ""))[0]}/*"
-          ]
-        } : null
-    ] : [])
-  })
+      }
+    }
+  }
 }

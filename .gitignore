@@ -44,3 +44,7 @@ go.sum
 
 # Terraform tests 
 tests/*.auto.tfvars
+
+
+# Debug mode auto-generated files
+autogen/

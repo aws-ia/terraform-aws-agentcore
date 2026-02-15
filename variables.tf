@@ -1,926 +1,405 @@
-# – Agent Core Runtime –
+# – Agent Core Runtimes –
+variable "project_prefix" {
+  description = "Prefix for all AWS resource names created by this module. Helps identify and organize resources."
+  type        = string
+  default     = "agentcore"
 
-variable "create_runtime" {
-  description = "Whether or not to create an agent core runtime."
+  validation {
+    condition     = can(regex("^[a-z0-9-]{1,20}$", var.project_prefix))
+    error_message = "project_prefix must be lowercase alphanumeric with hyphens, max 20 characters."
+  }
+}
+
+variable "tags" {
+  description = "Tags to apply to all resources created by this module."
+  type        = map(string)
+  default = {
+    IaC           = "Terraform"
+    ModuleName    = "terraform-aws-agentcore"
+    ModuleSource  = "https://github.com/aws-ia/terraform-aws-agentcore"
+    ModuleVersion = "" # Set dynamically from VERSION file in locals
+  }
+}
+
+variable "debug" {
+  description = "Enable debug mode: generates .env files with actual resource IDs in code_source_path directories for local testing."
   type        = bool
   default     = false
 }
 
-variable "runtime_name" {
-  description = "The name of the agent core runtime."
-  type        = string
-  default     = "TerraformBedrockAgentCoreRuntime"
-}
+variable "runtimes" {
+  description = "Map of AgentCore runtimes to create. Each key is the runtime name."
+  type = map(object({
+    source_type = string # "CODE" or "CONTAINER"
 
-variable "runtime_description" {
-  description = "Description of the agent runtime."
-  type        = string
-  default     = null
-}
+    # CODE: Module-managed (provide source_path)
+    code_source_path = optional(string)
 
-variable "runtime_role_arn" {
-  description = "Optional external IAM role ARN for the Bedrock agent core runtime. If empty, the module will create one internally."
-  type        = string
-  default     = null
-}
+    # CODE: User-managed (provide s3_bucket)
+    code_s3_bucket     = optional(string)
+    code_s3_key        = optional(string)
+    code_s3_version_id = optional(string)
 
-variable "runtime_artifact_type" {
-  description = "The type of artifact to use for the agent core runtime. Valid values: container, code."
-  type        = string
-  default     = "container"
+    # CODE: Required for both
+    code_entry_point = optional(list(string))
+    code_runtime     = optional(string, "PYTHON_3_11") # Default to PYTHON_3_11
 
-  validation {
-    condition     = contains(["container", "code"], var.runtime_artifact_type)
-    error_message = "The runtime_artifact_type must be either container or code."
-  }
-}
+    # CONTAINER: Module-managed (provide source_path)
+    container_source_path     = optional(string)
+    container_dockerfile_name = optional(string, "Dockerfile")
+    container_image_tag       = optional(string, "latest")
 
-variable "runtime_container_uri" {
-  description = "The ECR URI of the container for the agent core runtime. Required when runtime_artifact_type is set to 'container'."
-  type        = string
-  default     = null
-}
+    # CONTAINER: User-managed (provide image_uri)
+    container_image_uri = optional(string)
 
-variable "runtime_code_s3_bucket" {
-  description = "S3 bucket containing the code package for the agent core runtime. Required when runtime_artifact_type is set to 'code'."
-  type        = string
-  default     = null
-}
-
-variable "runtime_code_s3_prefix" {
-  description = "S3 prefix (key) for the code package. Required when runtime_artifact_type is set to 'code'."
-  type        = string
-  default     = null
-}
-
-variable "runtime_code_s3_version_id" {
-  description = "S3 version ID of the code package. Optional when runtime_artifact_type is set to 'code'."
-  type        = string
-  default     = null
-}
-
-variable "runtime_code_entry_point" {
-  description = "Entry point for the code runtime. Required when runtime_artifact_type is set to 'code'."
-  type        = list(string)
-  default     = null
-}
-
-variable "runtime_code_runtime_type" {
-  description = "Runtime type for the code. Required when runtime_artifact_type is set to 'code'. Valid values: PYTHON_3_10, PYTHON_3_11, PYTHON_3_12, PYTHON_3_13"
-  type        = string
-  default     = null
-
-  validation {
-    condition     = var.runtime_code_runtime_type == null || contains(["PYTHON_3_10", "PYTHON_3_11", "PYTHON_3_12", "PYTHON_3_13"], var.runtime_code_runtime_type)
-    error_message = "The runtime_code_runtime_type must be one of: PYTHON_3_10, PYTHON_3_11, PYTHON_3_12, PYTHON_3_13."
-  }
-}
-
-variable "runtime_network_mode" {
-  description = "Network mode configuration type for the agent core runtime. Valid values: PUBLIC, VPC."
-  type        = string
-  default     = "PUBLIC"
-
-  validation {
-    condition     = contains(["PUBLIC", "VPC"], var.runtime_network_mode)
-    error_message = "The runtime_network_mode must be either PUBLIC or VPC."
-  }
-}
-
-variable "runtime_network_configuration" {
-  description = "VPC network configuration for the agent core runtime."
-  type = object({
-    security_groups = optional(list(string))
-    subnets         = optional(list(string))
-  })
-  default = null
-}
-
-variable "runtime_environment_variables" {
-  description = "Environment variables for the agent core runtime."
-  type        = map(string)
-  default     = null
-}
-
-variable "runtime_authorizer_configuration" {
-  description = "Authorizer configuration for the agent core runtime."
-  type = object({
-    custom_jwt_authorizer = object({
-      allowed_audience = optional(list(string))
-      allowed_clients  = optional(list(string))
-      discovery_url    = string
-    })
-  })
-  default = null
-}
-
-variable "runtime_protocol_configuration" {
-  description = "Protocol configuration for the agent core runtime."
-  type        = string
-  default     = null
-}
-
-variable "runtime_lifecycle_configuration" {
-  description = "Lifecycle configuration for managing runtime sessions."
-  type = object({
-    idle_runtime_session_timeout = optional(number)
-    max_lifetime                 = optional(number)
-  })
-  default = null
-}
-
-variable "runtime_request_header_configuration" {
-  description = "Configuration for HTTP request headers."
-  type = object({
-    request_header_allowlist = optional(set(string))
-  })
-  default = null
-}
-
-variable "runtime_tags" {
-  description = "A map of tag keys and values for the agent core runtime."
-  type        = map(string)
-  default     = null
-}
-
-# – Agent Core Runtime Endpoint –
-
-variable "create_runtime_endpoint" {
-  description = "Whether or not to create an agent core runtime endpoint."
-  type        = bool
-  default     = false
-}
-
-variable "runtime_endpoint_name" {
-  description = "The name of the agent core runtime endpoint."
-  type        = string
-  default     = "TerraformBedrockAgentCoreRuntimeEndpoint"
-}
-
-variable "runtime_endpoint_description" {
-  description = "Description of the agent core runtime endpoint."
-  type        = string
-  default     = null
-}
-
-variable "runtime_endpoint_agent_runtime_id" {
-  description = "The ID of the agent core runtime associated with the endpoint. If not provided, it will use the ID of the agent runtime created by this module."
-  type        = string
-  default     = null
-}
-
-variable "runtime_endpoint_tags" {
-  description = "A map of tag keys and values for the agent core runtime endpoint."
-  type        = map(string)
-  default     = null
-}
-
-# – Agent Core Memory –
-
-variable "create_memory" {
-  description = "Whether or not to create an agent core memory."
-  type        = bool
-  default     = false
-}
-
-variable "memory_name" {
-  description = "The name of the agent core memory."
-  type        = string
-  default     = "TerraformBedrockAgentCoreMemory"
-}
-
-variable "memory_description" {
-  description = "Description of the agent core memory."
-  type        = string
-  default     = null
-}
-
-variable "memory_event_expiry_duration" {
-  description = "Duration in days until memory events expire."
-  type        = number
-  default     = 90
-}
-
-variable "memory_execution_role_arn" {
-  description = "Optional IAM role ARN for the Bedrock agent core memory."
-  type        = string
-  default     = null
-}
-
-variable "memory_encryption_key_arn" {
-  description = "The ARN of the KMS key used to encrypt the memory."
-  type        = string
-  default     = null
-}
-
-variable "memory_strategies" {
-  description = "List of memory strategies attached to this memory."
-  type = list(object({
-    semantic_memory_strategy = optional(object({
-      name        = optional(string)
-      description = optional(string)
-      namespaces  = optional(list(string))
+    # Shared configuration
+    execution_role_arn       = optional(string) # Required for user-managed
+    description              = optional(string)
+    execution_network_mode   = optional(string, "PUBLIC")
+    execution_network_config = optional(object({
+      security_groups = list(string)
+      subnets         = list(string)
     }))
-    summary_memory_strategy = optional(object({
-      name        = optional(string)
-      description = optional(string)
-      namespaces  = optional(list(string))
-    }))
-    user_preference_memory_strategy = optional(object({
-      name        = optional(string)
-      description = optional(string)
-      namespaces  = optional(list(string))
-    }))
-    custom_memory_strategy = optional(object({
-      name        = optional(string)
-      description = optional(string)
-      namespaces  = optional(list(string))
-      configuration = optional(object({
-        self_managed_configuration = optional(object({
-          historical_context_window_size = optional(number, 4) # Default to 4 messages
-          invocation_configuration = object({
-            # Both fields are required when a self-managed configuration is used
-            payload_delivery_bucket_name = string
-            topic_arn                    = string
-          })
-          trigger_conditions = optional(list(object({
-            message_based_trigger = optional(object({
-              message_count = optional(number, 1) # Default to 1 message
-            }))
-            time_based_trigger = optional(object({
-              idle_session_timeout = optional(number, 10) # Default to 10 seconds
-            }))
-            token_based_trigger = optional(object({
-              token_count = optional(number, 100) # Default to 100 tokens
-            }))
-          })))
-        }))
-        semantic_override = optional(object({
-          consolidation = optional(object({
-            append_to_prompt = optional(string)
-            model_id         = optional(string)
-          }))
-          extraction = optional(object({
-            append_to_prompt = optional(string)
-            model_id         = optional(string)
-          }))
-        }))
-        summary_override = optional(object({
-          consolidation = optional(object({
-            append_to_prompt = optional(string)
-            model_id         = optional(string)
-          }))
-        }))
-        user_preference_override = optional(object({
-          consolidation = optional(object({
-            append_to_prompt = optional(string)
-            model_id         = optional(string)
-          }))
-          extraction = optional(object({
-            append_to_prompt = optional(string)
-            model_id         = optional(string)
-          }))
-        }))
-      }))
-    }))
+    environment_variables = optional(map(string), {})
+
+    create_endpoint      = optional(bool, true)
+    endpoint_description = optional(string)
+    tags                 = optional(map(string))
   }))
-  default = []
-}
-
-variable "memory_tags" {
-  description = "A map of tag keys and values for the agent core memory."
-  type        = map(string)
-  default     = null
-}
-
-# – Agent Core Gateway –
-
-variable "create_gateway" {
-  description = "Whether or not to create an agent core gateway."
-  type        = bool
-  default     = false
-}
-
-variable "gateway_name" {
-  description = "The name of the agent core gateway."
-  type        = string
-  default     = "TerraformBedrockAgentCoreGateway"
-}
-
-variable "gateway_description" {
-  description = "Description of the agent core gateway."
-  type        = string
-  default     = null
-}
-
-variable "gateway_role_arn" {
-  description = "Optional external IAM role ARN for the Bedrock agent core gateway. If empty, the module will create one internally."
-  type        = string
-  default     = null
-}
-
-variable "gateway_authorizer_type" {
-  description = "The authorizer type for the gateway. Valid values: AWS_IAM, CUSTOM_JWT."
-  type        = string
-  default     = "CUSTOM_JWT"
+  default = {}
 
   validation {
-    condition     = contains(["AWS_IAM", "CUSTOM_JWT"], var.gateway_authorizer_type)
-    error_message = "The gateway_authorizer_type must be either AWS_IAM or CUSTOM_JWT."
-  }
-}
-
-variable "gateway_protocol_type" {
-  description = "The protocol type for the gateway. Valid value: MCP."
-  type        = string
-  default     = "MCP"
-
-  validation {
-    condition     = var.gateway_protocol_type == "MCP"
-    error_message = "The gateway_protocol_type must be MCP."
-  }
-}
-
-variable "gateway_exception_level" {
-  description = "Exception level for the gateway. Valid values: DEBUG, INFO, WARN, ERROR."
-  type        = string
-  default     = null
-
-  validation {
-    condition     = var.gateway_exception_level == null ? true : contains(["DEBUG", "INFO", "WARN", "ERROR"], var.gateway_exception_level)
-    error_message = "The gateway_exception_level must be in [DEBUG, INFO, WARN, ERROR]."
-  }
-}
-
-variable "gateway_kms_key_arn" {
-  description = "The ARN of the KMS key used to encrypt the gateway."
-  type        = string
-  default     = null
-}
-
-variable "gateway_authorizer_configuration" {
-  description = "Authorizer configuration for the agent core gateway."
-  type = object({
-    custom_jwt_authorizer = object({
-      allowed_audience = optional(list(string))
-      allowed_clients  = optional(list(string))
-      discovery_url    = string
-    })
-  })
-  default = null
-}
-
-variable "gateway_protocol_configuration" {
-  description = "Protocol configuration for the agent core gateway."
-  type = object({
-    mcp = object({
-      instructions       = optional(string)
-      search_type        = optional(string)
-      supported_versions = optional(list(string))
-    })
-  })
-  default = null
-}
-
-variable "gateway_interceptor_configurations" {
-  description = "List of interceptor configurations for the gateway. Interceptors allow you to intercept and process requests/responses using Lambda functions. You can configure up to 2 interceptors (one for REQUEST, one for RESPONSE)."
-  type = list(object({
-    interception_points = list(string) # Required: ["REQUEST"] or ["RESPONSE"] or ["REQUEST", "RESPONSE"]
-    interceptor = object({             # Required: Lambda function configuration
-      lambda = object({
-        arn = string # Required: Lambda function ARN
-      })
-    })
-    input_configuration = optional(object({ # Optional: Input configuration
-      pass_request_headers = bool           # Required if block is present
-    }))
-  }))
-  default = []
-
-  validation {
-    condition     = length(var.gateway_interceptor_configurations) <= 2
-    error_message = "You can configure at most 2 interceptor configurations (one for REQUEST, one for RESPONSE)."
+    condition = alltrue([
+      for name, config in var.runtimes :
+      can(regex("^[a-zA-Z][a-zA-Z0-9_]{0,47}$", name))
+    ])
+    error_message = "Runtime names must start with a letter and contain only letters, numbers, and underscores (max 48 characters)."
   }
 
   validation {
     condition = alltrue([
-      for config in var.gateway_interceptor_configurations :
-      alltrue([
-        for point in config.interception_points :
-        contains(["REQUEST", "RESPONSE"], point)
-      ])
+      for name, config in var.runtimes :
+      contains(["CODE", "CONTAINER"], config.source_type)
     ])
-    error_message = "Each interception_points value must be either 'REQUEST' or 'RESPONSE'."
-  }
-}
-
-variable "gateway_tags" {
-  description = "A map of tag keys and values for the agent core gateway."
-  type        = map(string)
-  default     = null
-}
-
-variable "gateway_allow_create_permissions" {
-  description = "Whether to allow create permissions for the gateway."
-  type        = bool
-  default     = true
-}
-
-variable "gateway_allow_update_delete_permissions" {
-  description = "Whether to allow update and delete permissions for the gateway."
-  type        = bool
-  default     = false
-}
-
-# - IAM -
-variable "permissions_boundary_arn" {
-  description = "The ARN of the IAM permission boundary for the role."
-  type        = string
-  default     = null
-}
-
-# - Lambda Function Access -
-variable "gateway_lambda_function_arns" {
-  description = "List of Lambda function ARNs that the gateway service role should be able to invoke. Required when using Lambda targets."
-  type        = list(string)
-  default     = []
-}
-
-variable "gateway_cross_account_lambda_permissions" {
-  description = "Configuration for cross-account Lambda function access. Required only if Lambda functions are in different AWS accounts."
-  type = list(object({
-    lambda_function_arn      = string
-    gateway_service_role_arn = string
-  }))
-  default = []
-}
-
-# - OAuth Outbound Authorization -
-variable "enable_oauth_outbound_auth" {
-  description = "Whether to enable outbound authorization with an OAuth client for the gateway."
-  type        = bool
-  default     = false
-}
-
-variable "oauth_credential_provider_arn" {
-  description = "ARN of the OAuth credential provider created with CreateOauth2CredentialProvider. Required when enable_oauth_outbound_auth is true."
-  type        = string
-  default     = null
-}
-
-variable "oauth_secret_arn" {
-  description = "ARN of the AWS Secrets Manager secret containing the OAuth client credentials. Required when enable_oauth_outbound_auth is true."
-  type        = string
-  default     = null
-}
-
-# - API Key Outbound Authorization -
-variable "enable_apikey_outbound_auth" {
-  description = "Whether to enable outbound authorization with an API key for the gateway."
-  type        = bool
-  default     = false
-}
-
-variable "apikey_credential_provider_arn" {
-  description = "ARN of the API key credential provider created with CreateApiKeyCredentialProvider. Required when enable_apikey_outbound_auth is true."
-  type        = string
-  default     = null
-}
-
-variable "apikey_secret_arn" {
-  description = "ARN of the AWS Secrets Manager secret containing the API key. Required when enable_apikey_outbound_auth is true."
-  type        = string
-  default     = null
-}
-
-# – Agent Core Browser Custom –
-
-variable "create_browser" {
-  description = "Whether or not to create an agent core browser custom."
-  type        = bool
-  default     = false
-}
-
-variable "browser_name" {
-  description = "The name of the agent core browser. Valid characters are a-z, A-Z, 0-9, _ (underscore). The name must start with a letter and can be up to 48 characters long."
-  type        = string
-  default     = "TerraformBedrockAgentCoreBrowser"
-
-  validation {
-    condition     = can(regex("^[a-zA-Z][a-zA-Z0-9_]{0,47}$", var.browser_name))
-    error_message = "The browser_name must start with a letter and can only include letters, numbers, and underscores, with a maximum length of 48 characters."
-  }
-}
-
-variable "browser_description" {
-  description = "Description of the agent core browser."
-  type        = string
-  default     = null
-}
-
-variable "browser_role_arn" {
-  description = "Optional external IAM role ARN for the Bedrock agent core browser. If empty, the module will create one internally."
-  type        = string
-  default     = null
-}
-
-variable "browser_network_mode" {
-  description = "Network mode configuration type for the agent core browser. Valid values: PUBLIC, VPC."
-  type        = string
-  default     = "PUBLIC"
-
-  validation {
-    condition     = contains(["PUBLIC", "VPC"], var.browser_network_mode)
-    error_message = "The browser_network_mode must be either PUBLIC or VPC."
-  }
-}
-
-variable "browser_network_configuration" {
-  description = "VPC network configuration for the agent core browser. Required when browser_network_mode is set to 'VPC'."
-  type = object({
-    security_groups = optional(list(string))
-    subnets         = optional(list(string))
-  })
-  default = null
-
-  validation {
-    condition     = var.browser_network_configuration == null || (try(length(coalesce(var.browser_network_configuration.security_groups, [])), 0) > 0 && try(length(coalesce(var.browser_network_configuration.subnets, [])), 0) > 0)
-    error_message = "When providing browser_network_configuration, you must include at least one security group and one subnet."
-  }
-}
-
-variable "browser_recording_enabled" {
-  description = "Whether to enable browser session recording to S3."
-  type        = bool
-  default     = false
-}
-
-variable "browser_recording_config" {
-  description = "Configuration for browser session recording when enabled. Bucket name must follow S3 naming conventions (lowercase alphanumeric characters, dots, and hyphens), between 3 and 63 characters, starting and ending with alphanumeric character."
-  type = object({
-    bucket = string
-    prefix = string
-  })
-  default = null
-
-  validation {
-    condition     = var.browser_recording_config == null || try(can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.browser_recording_config.bucket)), false)
-    error_message = "S3 bucket name must follow naming conventions: lowercase alphanumeric characters, dots and hyphens, 3-63 characters long, starting and ending with alphanumeric character."
+    error_message = "source_type must be either 'CODE' or 'CONTAINER'."
   }
 
   validation {
-    condition     = var.browser_recording_config == null || try(var.browser_recording_config.prefix != null, true)
-    error_message = "When providing a recording configuration, the S3 prefix cannot be null."
-  }
-}
-
-variable "browser_tags" {
-  description = "A map of tag keys and values for the agent core browser. Each tag key and value must be between 1 and 256 characters and can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
-  type        = map(string)
-  default     = null
-
-  validation {
-    condition = var.browser_tags == null || alltrue(try([
-      for k, v in var.browser_tags :
-      length(k) >= 1 && length(k) <= 256 &&
-      length(v) >= 1 && length(v) <= 256
-    ], [true]))
-    error_message = "Each tag key and value must be between 1 and 256 characters in length."
+    condition = alltrue([
+      for name, config in var.runtimes :
+      config.source_type != "CODE" || (
+        (config.code_source_path != null && config.code_s3_bucket == null) ||
+        (config.code_source_path == null && config.code_s3_bucket != null)
+      )
+    ])
+    error_message = "For CODE source_type: provide either code_source_path (module-managed) OR code_s3_bucket (user-managed), not both."
   }
 
   validation {
-    condition = var.browser_tags == null || alltrue(try([
-      for k, v in var.browser_tags :
-      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) &&
-      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
-    ], [true]))
-    error_message = "Tag keys and values can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
-  }
-}
-
-# – Agent Core Code Interpreter Custom –
-
-variable "create_code_interpreter" {
-  description = "Whether or not to create an agent core code interpreter custom."
-  type        = bool
-  default     = false
-}
-
-variable "code_interpreter_name" {
-  description = "The name of the agent core code interpreter. Valid characters are a-z, A-Z, 0-9, _ (underscore). The name must start with a letter and can be up to 48 characters long."
-  type        = string
-  default     = "TerraformBedrockAgentCoreCodeInterpreter"
-
-  validation {
-    condition     = length(var.code_interpreter_name) >= 1 && length(var.code_interpreter_name) <= 48
-    error_message = "The code_interpreter_name must be between 1 and 48 characters in length."
+    condition = alltrue([
+      for name, config in var.runtimes :
+      config.source_type != "CODE" || config.code_runtime == null || contains(["PYTHON_3_10", "PYTHON_3_11", "PYTHON_3_12", "PYTHON_3_13"], config.code_runtime)
+    ])
+    error_message = "code_runtime must be one of: PYTHON_3_10, PYTHON_3_11, PYTHON_3_12, PYTHON_3_13."
   }
 
   validation {
-    condition     = can(regex("^[a-zA-Z][a-zA-Z0-9_]{0,47}$", var.code_interpreter_name))
-    error_message = "The code_interpreter_name must start with a letter and can only include letters, numbers, and underscores."
-  }
-}
-
-variable "code_interpreter_description" {
-  description = "Description of the agent core code interpreter. Valid characters are a-z, A-Z, 0-9, _ (underscore), - (hyphen) and spaces. The description can have up to 200 characters."
-  type        = string
-  default     = null
-
-  validation {
-    condition     = var.code_interpreter_description == null || try(length(var.code_interpreter_description) <= 200, true)
-    error_message = "The code_interpreter_description must be 200 characters or less."
+    condition = alltrue([
+      for name, config in var.runtimes :
+      config.source_type != "CODE" || config.code_entry_point != null
+    ])
+    error_message = "code_entry_point is required when source_type is CODE."
   }
 
   validation {
-    condition     = var.code_interpreter_description == null || try(can(regex("^[a-zA-Z0-9_\\- ]*$", var.code_interpreter_description)), true)
-    error_message = "The code_interpreter_description can only include letters, numbers, underscores, hyphens, and spaces."
-  }
-}
-
-variable "code_interpreter_role_arn" {
-  description = "Optional external IAM role ARN for the Bedrock agent core code interpreter. If empty, the module will create one internally."
-  type        = string
-  default     = null
-}
-
-variable "code_interpreter_network_mode" {
-  description = "Network mode configuration type for the agent core code interpreter. Valid values: SANDBOX, VPC."
-  type        = string
-  default     = "SANDBOX"
-
-  validation {
-    condition     = contains(["SANDBOX", "VPC"], var.code_interpreter_network_mode)
-    error_message = "The code_interpreter_network_mode must be either SANDBOX or VPC."
-  }
-}
-
-variable "code_interpreter_network_configuration" {
-  description = "VPC network configuration for the agent core code interpreter."
-  type = object({
-    security_groups = optional(list(string))
-    subnets         = optional(list(string))
-  })
-  default = null
-}
-
-variable "code_interpreter_tags" {
-  description = "A map of tag keys and values for the agent core code interpreter. Each tag key and value must be between 1 and 256 characters and can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
-  type        = map(string)
-  default     = null
-
-  validation {
-    condition = var.code_interpreter_tags == null || alltrue(try([
-      for k, v in var.code_interpreter_tags :
-      length(k) >= 1 && length(k) <= 256 &&
-      length(v) >= 1 && length(v) <= 256
-    ], [true]))
-    error_message = "Each tag key and value must be between 1 and 256 characters in length."
+    condition = alltrue([
+      for name, config in var.runtimes :
+      config.source_type != "CONTAINER" || (
+        (config.container_source_path != null && config.container_image_uri == null) ||
+        (config.container_source_path == null && config.container_image_uri != null)
+      )
+    ])
+    error_message = "For CONTAINER source_type: provide either container_source_path (module-managed) OR container_image_uri (user-managed), not both."
   }
 
   validation {
-    condition = var.code_interpreter_tags == null || alltrue(try([
-      for k, v in var.code_interpreter_tags :
-      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", k)) &&
-      can(regex("^[a-zA-Z0-9\\s._:/=+@-]*$", v))
-    ], [true]))
-    error_message = "Tag keys and values can only include alphanumeric characters, spaces, and the following special characters: _ . : / = + @ -"
+    condition = alltrue([
+      for name, config in var.runtimes :
+      !(config.source_type == "CODE" && config.code_s3_bucket != null && config.execution_role_arn == null)
+    ])
+    error_message = "execution_role_arn is required when using user-managed CODE (code_s3_bucket provided)."
   }
-}
-
-# – Agent Core Gateway Target –
-
-variable "create_gateway_target" {
-  description = "Whether or not to create a Bedrock agent core gateway target."
-  type        = bool
-  default     = false
-}
-
-variable "gateway_target_name" {
-  description = "The name of the gateway target."
-  type        = string
-  default     = "TerraformBedrockAgentCoreGatewayTarget"
-}
-
-variable "gateway_target_gateway_id" {
-  description = "Identifier of the gateway that this target belongs to. If not provided, it will use the ID of the gateway created by this module."
-  type        = string
-  default     = null
-}
-
-variable "gateway_target_description" {
-  description = "Description of the gateway target."
-  type        = string
-  default     = null
-}
-
-variable "gateway_target_credential_provider_type" {
-  description = "Type of credential provider to use for the gateway target. Valid values: GATEWAY_IAM_ROLE, API_KEY, OAUTH."
-  type        = string
-  default     = "GATEWAY_IAM_ROLE"
 
   validation {
-    condition     = var.gateway_target_credential_provider_type == null || contains(["GATEWAY_IAM_ROLE", "API_KEY", "OAUTH"], var.gateway_target_credential_provider_type)
-    error_message = "The gateway_target_credential_provider_type must be one of GATEWAY_IAM_ROLE, API_KEY, OAUTH, or null."
+    condition = alltrue([
+      for name, config in var.runtimes :
+      !(config.source_type == "CONTAINER" && config.container_image_uri != null && config.execution_role_arn == null)
+    ])
+    error_message = "execution_role_arn is required when using user-managed CONTAINER (container_image_uri provided)."
   }
-}
-
-variable "gateway_target_api_key_config" {
-  description = "Configuration for API key authentication for the gateway target."
-  type = object({
-    provider_arn              = string
-    credential_location       = optional(string)
-    credential_parameter_name = optional(string)
-    credential_prefix         = optional(string)
-  })
-  default = null
-}
-
-variable "gateway_target_oauth_config" {
-  description = "Configuration for OAuth authentication for the gateway target."
-  type = object({
-    provider_arn      = string
-    scopes            = optional(list(string))
-    custom_parameters = optional(map(string))
-  })
-  default = null
-}
-
-variable "gateway_target_type" {
-  description = "Type of target to create. Valid values: LAMBDA, MCP_SERVER."
-  type        = string
-  default     = "LAMBDA"
 
   validation {
-    condition     = var.gateway_target_type == null || contains(["LAMBDA", "MCP_SERVER"], var.gateway_target_type)
-    error_message = "The gateway_target_type must be one of LAMBDA, MCP_SERVER, or null."
+    condition = alltrue([
+      for name, config in var.runtimes :
+      config.execution_network_mode != "VPC" || config.execution_network_config != null
+    ])
+    error_message = "execution_network_config is required when execution_network_mode is VPC."
   }
 }
 
-variable "gateway_target_lambda_config" {
-  description = "Configuration for Lambda function target."
-  type = object({
-    lambda_arn       = string
-    tool_schema_type = string # INLINE or S3
-    inline_schema = optional(object({
-      name        = string
-      description = string
-      input_schema = object({
-        type        = string
+# – Agent Core Memories –
+
+variable "memories" {
+  description = "Map of AgentCore memories to create. Each key is the memory name. NOTE: Each memory can only have ONE strategy."
+  type = map(object({
+    description           = optional(string)
+    event_expiry_duration = optional(number, 90)
+    execution_role_arn    = optional(string)
+    encryption_key_arn    = optional(string)
+    
+    strategies = optional(list(object({
+      semantic_memory_strategy = optional(object({
+        name        = optional(string)
         description = optional(string)
-        properties = optional(list(object({
-          name        = string
-          type        = string
-          description = optional(string)
-          required    = optional(bool, false)
-          nested_properties = optional(list(object({
-            name        = string
-            type        = string
-            description = optional(string)
-            required    = optional(bool)
-          })))
-          items = optional(object({
-            type        = string
-            description = optional(string)
+        namespaces  = optional(list(string))
+      }))
+      summary_memory_strategy = optional(object({
+        name        = optional(string)
+        description = optional(string)
+        namespaces  = optional(list(string))
+      }))
+      user_preference_memory_strategy = optional(object({
+        name        = optional(string)
+        description = optional(string)
+        namespaces  = optional(list(string))
+      }))
+      custom_memory_strategy = optional(object({
+        name        = optional(string)
+        description = optional(string)
+        namespaces  = optional(list(string))
+        configuration = optional(object({
+          self_managed_configuration = optional(object({
+            historical_context_window_size = optional(number, 4)
+            invocation_configuration = object({
+              payload_delivery_bucket_name = string
+              topic_arn                    = string
+            })
+            trigger_conditions = optional(list(object({
+              message_based_trigger = optional(object({
+                message_count = optional(number, 1)
+              }))
+              time_based_trigger = optional(object({
+                idle_session_timeout = optional(number, 10)
+              }))
+              token_based_trigger = optional(object({
+                token_count = optional(number, 100)
+              }))
+            })))
           }))
-        })))
-        items = optional(object({
-          type        = string
-          description = optional(string)
-        }))
-      })
-      output_schema = optional(object({
-        type        = string
-        description = optional(string)
-        properties = optional(list(object({
-          name        = string
-          type        = string
-          description = optional(string)
-          required    = optional(bool)
-        })))
-        items = optional(object({
-          type        = string
-          description = optional(string)
+          semantic_override = optional(object({
+            consolidation = optional(object({
+              append_to_prompt = optional(string)
+              model_id         = optional(string)
+            }))
+            extraction = optional(object({
+              append_to_prompt = optional(string)
+              model_id         = optional(string)
+            }))
+          }))
+          summary_override = optional(object({
+            consolidation = optional(object({
+              append_to_prompt = optional(string)
+              model_id         = optional(string)
+            }))
+          }))
+          user_preference_override = optional(object({
+            consolidation = optional(object({
+              append_to_prompt = optional(string)
+              model_id         = optional(string)
+            }))
+            extraction = optional(object({
+              append_to_prompt = optional(string)
+              model_id         = optional(string)
+            }))
+          }))
         }))
       }))
+    })), [])
+    
+    tags = optional(map(string))
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for name, config in var.memories :
+      length(config.strategies) <= 1
+    ])
+    error_message = "Each memory can only have ONE strategy. To use multiple strategies, create separate memory resources."
+  }
+}
+
+# – Agent Core Gateways –
+
+variable "gateways" {
+  description = "Map of AgentCore gateways to create. Each key is the gateway name."
+  type = map(object({
+    description      = optional(string)
+    role_arn         = optional(string)
+    authorizer_type  = optional(string, "AWS_IAM")
+    protocol_type    = optional(string, "MCP")
+    exception_level  = optional(string, "DEBUG")
+    kms_key_arn      = optional(string)
+    
+    authorizer_configuration = optional(object({
+      custom_jwt_authorizer = object({
+        allowed_audience = list(string)
+        allowed_clients  = optional(list(string))
+        discovery_url    = string
+      })
     }))
-    s3_schema = optional(object({
-      uri                     = string
-      bucket_owner_account_id = optional(string)
+    
+    protocol_configuration = optional(object({
+      mcp = object({
+        instructions       = optional(string)
+        search_type        = optional(string, "SEMANTIC")
+        supported_versions = optional(list(string), ["1.0.0"])
+      })
     }))
-  })
-  default = null
+    
+    interceptor_configurations = optional(list(object({
+      interception_points = list(string)
+      interceptor = object({
+        lambda = object({
+          arn = string
+        })
+      })
+      input_configuration = optional(object({
+        pass_request_headers = optional(bool, false)
+      }))
+    })), [])
+    
+    tags = optional(map(string))
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateways :
+      can(regex("^([0-9a-zA-Z][-]?){1,100}$", name))
+    ])
+    error_message = "Gateway names must match pattern ^([0-9a-zA-Z][-]?){1,100}$ (alphanumeric with optional hyphens, no underscores)."
+  }
 }
 
-variable "gateway_target_mcp_server_config" {
-  description = "Configuration for MCP server target."
-  type = object({
-    endpoint = string
-  })
-  default = null
+variable "gateway_targets" {
+  description = "Map of AgentCore gateway targets to create. Each key is the target name."
+  type = map(object({
+    gateway_name                = string
+    description                 = optional(string)
+    credential_provider_type    = optional(string)
+    
+    api_key_config = optional(object({
+      provider_arn              = string
+      credential_location       = string
+      credential_parameter_name = string
+      credential_prefix         = optional(string)
+    }))
+    
+    oauth_config = optional(object({
+      provider_arn      = string
+      scopes            = optional(list(string))
+      custom_parameters = optional(map(string))
+    }))
+    
+    type = string # "LAMBDA" or "MCP_SERVER"
+    
+    lambda_config = optional(object({
+      lambda_arn       = string
+      tool_schema_type = string # "INLINE" or "S3"
+      
+      inline_schema = optional(object({
+        name        = string
+        description = optional(string)
+        
+        input_schema = object({
+          type        = string
+          description = optional(string)
+          properties  = optional(list(any))
+          items       = optional(any)
+        })
+        
+        output_schema = optional(object({
+          type        = string
+          description = optional(string)
+          properties  = optional(list(any))
+          items       = optional(any)
+        }))
+      }))
+      
+      s3_schema = optional(object({
+        uri                     = string
+        bucket_owner_account_id = optional(string)
+      }))
+    }))
+    
+    mcp_server_config = optional(object({
+      endpoint = string
+    }))
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateway_targets :
+      can(regex("^([0-9a-zA-Z][-]?){1,100}$", name))
+    ])
+    error_message = "Gateway target names must match pattern ^([0-9a-zA-Z][-]?){1,100}$ (alphanumeric with optional hyphens, no underscores)."
+  }
 }
 
-# – Agent Core Workload Identity –
+# – Agent Core Browsers –
 
-variable "create_workload_identity" {
-  description = "Whether or not to create a Bedrock agent core workload identity."
-  type        = bool
-  default     = false
-}
-
-variable "workload_identity_name" {
-  description = "The name of the workload identity."
-  type        = string
-  default     = "TerraformBedrockAgentCoreWorkloadIdentity"
-}
-
-variable "workload_identity_allowed_resource_oauth_2_return_urls" {
-  description = "The list of allowed OAuth2 return URLs for resources associated with this workload identity."
-  type        = list(string)
-  default     = null
-}
-
-variable "workload_identity_tags" {
-  description = "A map of tag keys and values for the workload identity."
-  type        = map(string)
-  default     = null
-}
-
-# – Cognito User Pool (for JWT Authentication Fallback) –
-
-variable "user_pool_name" {
-  description = "The name of the Cognito User Pool to create when JWT auth info is not provided."
-  type        = string
-  default     = "AgentCoreUserPool"
-}
-
-variable "user_pool_password_policy" {
-  description = "Password policy for the Cognito User Pool."
-  type = object({
-    minimum_length    = optional(number, 8)
-    require_lowercase = optional(bool, true)
-    require_numbers   = optional(bool, true)
-    require_symbols   = optional(bool, true)
-    require_uppercase = optional(bool, true)
-  })
+variable "browsers" {
+  description = "Map of AgentCore custom browsers to create. Each key is the browser name."
+  type = map(object({
+    description          = optional(string)
+    execution_role_arn   = optional(string)
+    network_mode         = optional(string, "PUBLIC")
+    
+    network_configuration = optional(object({
+      security_groups = list(string)
+      subnets         = list(string)
+    }))
+    
+    recording_enabled = optional(bool, false)
+    
+    recording_config = optional(object({
+      bucket = string
+      prefix = string
+    }))
+    
+    tags = optional(map(string))
+  }))
   default = {}
 }
 
-variable "user_pool_mfa_configuration" {
-  description = "MFA configuration for the Cognito User Pool. Valid values: OFF, OPTIONAL, REQUIRED."
-  type        = string
-  default     = "OFF"
+# – Agent Core Code Interpreters –
 
-  validation {
-    condition     = contains(["OFF", "OPTIONAL", "REQUIRED"], var.user_pool_mfa_configuration)
-    error_message = "The user_pool_mfa_configuration must be one of OFF, OPTIONAL, or REQUIRED."
-  }
+variable "code_interpreters" {
+  description = "Map of AgentCore custom code interpreters to create. Each key is the interpreter name."
+  type = map(object({
+    description          = optional(string)
+    execution_role_arn   = optional(string)
+    network_mode         = optional(string, "SANDBOX")
+    
+    network_configuration = optional(object({
+      security_groups = list(string)
+      subnets         = list(string)
+    }))
+    
+    tags = optional(map(string))
+  }))
+  default = {}
 }
 
-variable "user_pool_allowed_clients" {
-  description = "List of allowed clients for the Cognito User Pool JWT authorizer."
-  type        = list(string)
-  default     = []
-}
-
-variable "user_pool_callback_urls" {
-  description = "List of allowed callback URLs for the Cognito User Pool client."
-  type        = list(string)
-  default     = ["http://localhost:3000"]
-}
-
-variable "user_pool_logout_urls" {
-  description = "List of allowed logout URLs for the Cognito User Pool client."
-  type        = list(string)
-  default     = ["http://localhost:3000"]
-}
-
-variable "user_pool_token_validity_hours" {
-  description = "Number of hours that ID and access tokens are valid for."
-  type        = number
-  default     = 24
-}
-
-variable "user_pool_refresh_token_validity_days" {
-  description = "Number of days that refresh tokens are valid for."
-  type        = number
-  default     = 30
-}
-
-variable "user_pool_create_admin" {
-  description = "Whether to create an admin user in the Cognito User Pool."
-  type        = bool
-  default     = false
-}
-
-variable "user_pool_admin_email" {
-  description = "Email address for the admin user."
-  type        = string
-  default     = "admin@example.com"
-}
-
-variable "user_pool_tags" {
-  description = "A map of tag keys and values for the Cognito User Pool."
-  type        = map(string)
-  default     = null
-}
