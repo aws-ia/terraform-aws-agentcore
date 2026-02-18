@@ -195,7 +195,7 @@ resource "aws_iam_role_policy_attachment" "memory_self_managed_policy" {
 
 # Create policy for KMS access when memory_encryption_key_arn is provided
 resource "aws_iam_policy" "memory_kms_policy" {
-  count       = local.create_memory ? 1 : 0
+  count       = local.create_kms_policy ? 1 : 0
   name        = trimprefix("${local.solution_prefix}-bedrock-agent-memory-kms-policy", "-")
   description = "Policy for Bedrock AgentCore memory KMS access"
 
@@ -226,7 +226,7 @@ resource "aws_iam_policy" "memory_kms_policy" {
 
 # Attach the KMS policy to the memory role when KMS is provided and a role exists
 resource "aws_iam_role_policy_attachment" "memory_kms_policy" {
-  count      = local.create_memory ? 1 : 0
+  count      = local.create_kms_policy ? 1 : 0
   role       = aws_iam_role.memory_role[0].name
   policy_arn = aws_iam_policy.memory_kms_policy[0].arn
 }
