@@ -148,8 +148,8 @@ resource "awscc_bedrockagentcore_runtime" "agent_runtime_code" {
 
 # Reference for agent runtime ID
 locals {
-  agent_runtime_id      = var.runtime_artifact_type == "container" ? try(awscc_bedrockagentcore_runtime.agent_runtime_container[0].agent_runtime_id, null) : try(awscc_bedrockagentcore_runtime.agent_runtime_code[0].agent_runtime_id, null)
-  agent_runtime_version = var.runtime_artifact_type == "container" ? try(awscc_bedrockagentcore_runtime.agent_runtime_container[0].agent_runtime_version, null) : try(awscc_bedrockagentcore_runtime.agent_runtime_code[0].agent_runtime_version, null)
+  agent_runtime_id      = var.runtime_artifact_type == "container" ? awscc_bedrockagentcore_runtime.agent_runtime_container[0].agent_runtime_id : awscc_bedrockagentcore_runtime.agent_runtime_code[0].agent_runtime_id
+  agent_runtime_version = var.runtime_artifact_type == "container" ? awscc_bedrockagentcore_runtime.agent_runtime_container[0].agent_runtime_version : awscc_bedrockagentcore_runtime.agent_runtime_code[0].agent_runtime_version
 }
 
 # IAM Role for Agent Runtime
