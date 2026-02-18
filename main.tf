@@ -148,7 +148,8 @@ resource "awscc_bedrockagentcore_runtime" "agent_runtime_code" {
 
 # Reference for agent runtime ID
 locals {
-  agent_runtime_id = var.runtime_artifact_type == "container" ? try(awscc_bedrockagentcore_runtime.agent_runtime_container[0].agent_runtime_id, null) : try(awscc_bedrockagentcore_runtime.agent_runtime_code[0].agent_runtime_id, null)
+  agent_runtime_id      = var.runtime_artifact_type == "container" ? try(awscc_bedrockagentcore_runtime.agent_runtime_container[0].agent_runtime_id, null) : try(awscc_bedrockagentcore_runtime.agent_runtime_code[0].agent_runtime_id, null)
+  agent_runtime_version = var.runtime_artifact_type == "container" ? try(awscc_bedrockagentcore_runtime.agent_runtime_container[0].agent_runtime_version, null) : try(awscc_bedrockagentcore_runtime.agent_runtime_code[0].agent_runtime_version, null)
 }
 
 # IAM Role for Agent Runtime
@@ -311,9 +312,10 @@ locals {
 }
 
 resource "awscc_bedrockagentcore_runtime_endpoint" "agent_runtime_endpoint" {
-  count            = local.create_runtime_endpoint ? 1 : 0
-  name             = trimprefix("${local.solution_prefix}_${local.sanitized_runtime_endpoint_name}", "_")
-  description      = var.runtime_endpoint_description
-  agent_runtime_id = var.runtime_endpoint_agent_runtime_id != null ? var.runtime_endpoint_agent_runtime_id : local.agent_runtime_id
-  tags             = var.runtime_endpoint_tags
+  count                 = local.create_runtime_endpoint ? 1 : 0
+  name                  = trimprefix("${local.solution_prefix}_${local.sanitized_runtime_endpoint_name}", "_")
+  description           = var.runtime_endpoint_description
+  agent_runtime_id      = coalesce(var.runtime_endpoint_agent_runtime_id, local.agent_runtime_id)
+  agent_runtime_version = var.runtime_endpoint_agent_runtime_version_ignore ? null : coalesce(var.runtime_endpoint_agent_runtime_version, local.agent_runtime_version)
+  tags                  = var.runtime_endpoint_tags
 }

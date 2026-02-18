@@ -169,6 +169,18 @@ variable "runtime_endpoint_agent_runtime_id" {
   default     = null
 }
 
+variable "runtime_endpoint_agent_runtime_version" {
+  description = "The version of the agent core runtime associated with the endpoint. If not provided, it will use the version of the agent runtime created by this module."
+  type        = string
+  default     = null
+}
+
+variable "runtime_endpoint_agent_runtime_version_ignore" {
+  description = "Whether to ignore the version of the agent core runtime associated with the endpoint. If set to true, it will use the version of the agent runtime created by this module."
+  type        = bool
+  default     = false
+}
+
 variable "runtime_endpoint_tags" {
   description = "A map of tag keys and values for the agent core runtime endpoint."
   type        = map(string)
