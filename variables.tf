@@ -924,3 +924,9 @@ variable "user_pool_tags" {
   type        = map(string)
   default     = null
 }
+
+variable "use_solution_prefix" {
+  description = "Whether or not to create a random string prefix for resource names to ensure uniqueness. This is useful when deploying multiple instances of this module in the same AWS account/region."
+  type        = bool
+  default     = true
+}

@@ -92,7 +92,7 @@ locals {
 # IAM Role for Agent Memory 
 resource "aws_iam_role" "memory_role" {
   count = local.create_memory_role ? 1 : 0
-  name  = "${random_string.solution_prefix.result}-bedrock-agent-memory-role"
+  name  = trimprefix("${local.solution_prefix}-bedrock-agent-memory-role", "-")
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -150,7 +150,7 @@ locals {
 resource "aws_iam_policy" "memory_self_managed_policy" {
   # Only create if we have a memory role AND self-managed strategies are present
   count       = local.create_memory_role && local.has_self_managed_strategies ? 1 : 0
-  name        = "${random_string.solution_prefix.result}-bedrock-agent-memory-self-managed-policy"
+  name        = trimprefix("${local.solution_prefix}-bedrock-agent-memory-self-managed-policy", "-")
   description = "Policy for Bedrock AgentCore self-managed memory strategies"
 
   policy = jsonencode({
@@ -196,7 +196,7 @@ resource "aws_iam_role_policy_attachment" "memory_self_managed_policy" {
 # Create policy for KMS access when memory_encryption_key_arn is provided
 resource "aws_iam_policy" "memory_kms_policy" {
   count       = local.create_memory ? 1 : 0
-  name        = "${random_string.solution_prefix.result}-bedrock-agent-memory-kms-policy"
+  name        = trimprefix("${local.solution_prefix}-bedrock-agent-memory-kms-policy", "-")
   description = "Policy for Bedrock AgentCore memory KMS access"
 
   policy = jsonencode({
@@ -339,7 +339,7 @@ locals {
 
 resource "awscc_bedrockagentcore_memory" "agent_memory" {
   count                     = local.create_memory ? 1 : 0
-  name                      = "${random_string.solution_prefix.result}_${local.sanitized_memory_name}"
+  name                      = trimprefix("${local.solution_prefix}_${local.sanitized_memory_name}", "_")
   description               = var.memory_description
   event_expiry_duration     = var.memory_event_expiry_duration
   encryption_key_arn        = var.memory_encryption_key_arn

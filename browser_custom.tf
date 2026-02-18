@@ -155,7 +155,7 @@ locals {
 
 resource "awscc_bedrockagentcore_browser_custom" "agent_browser" {
   count              = local.create_browser ? 1 : 0
-  name               = "${random_string.solution_prefix.result}_${local.browser_name}"
+  name               = trimprefix("${local.solution_prefix}_${local.browser_name}", "-")
   description        = var.browser_description
   execution_role_arn = var.browser_role_arn != null ? var.browser_role_arn : aws_iam_role.browser_role[0].arn
 
@@ -188,7 +188,7 @@ resource "awscc_bedrockagentcore_browser_custom" "agent_browser" {
 # IAM Role for Browser
 resource "aws_iam_role" "browser_role" {
   count = local.create_browser && var.browser_role_arn == null ? 1 : 0
-  name  = "${random_string.solution_prefix.result}-bedrock-agent-browser-role"
+  name  = trimprefix("${local.solution_prefix}-bedrock-agent-browser-role", "-")
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -219,7 +219,7 @@ resource "aws_iam_role" "browser_role" {
 # IAM Policy for Browser
 resource "aws_iam_role_policy" "browser_role_policy" {
   count = local.create_browser && var.browser_role_arn == null ? 1 : 0
-  name  = "${random_string.solution_prefix.result}-bedrock-agent-browser-policy"
+  name  = trimprefix("${local.solution_prefix}-bedrock-agent-browser-policy", "-")
   role  = aws_iam_role.browser_role[0].name
 
   policy = jsonencode({

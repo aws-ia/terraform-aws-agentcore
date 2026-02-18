@@ -42,7 +42,7 @@ locals {
 
 resource "awscc_bedrockagentcore_gateway" "agent_gateway" {
   count       = local.create_gateway ? 1 : 0
-  name        = "${random_string.solution_prefix.result}-${var.gateway_name}"
+  name        = trimprefix("${local.solution_prefix}-${var.gateway_name}", "-")
   description = var.gateway_description
   role_arn    = var.gateway_role_arn != null ? var.gateway_role_arn : aws_iam_role.gateway_role[0].arn
 
@@ -95,7 +95,7 @@ resource "awscc_bedrockagentcore_gateway" "agent_gateway" {
 # IAM Role for Agent Gateway
 resource "aws_iam_role" "gateway_role" {
   count = local.create_gateway && var.gateway_role_arn == null ? 1 : 0
-  name  = "${random_string.solution_prefix.result}-bedrock-agent-gateway-role"
+  name  = trimprefix("${local.solution_prefix}-bedrock-agent-gateway-role", "-")
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -141,7 +141,7 @@ resource "aws_lambda_permission" "cross_account_lambda_permissions" {
 # IAM Policy for Agent Gateway
 resource "aws_iam_role_policy" "gateway_role_policy" {
   count = local.create_gateway && var.gateway_role_arn == null ? 1 : 0
-  name  = "${random_string.solution_prefix.result}-bedrock-agent-gateway-policy"
+  name  = trimprefix("${local.solution_prefix}-bedrock-agent-gateway-policy", "-")
   role  = aws_iam_role.gateway_role[0].name
 
   policy = jsonencode({
@@ -177,7 +177,7 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
           ]
           Resource = [
             "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
-            "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${random_string.solution_prefix.result}-${var.gateway_name}-*"
+            "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${trimprefix("${local.solution_prefix}-${var.gateway_name}-*", "-")}"
           ]
         },
         {
@@ -189,7 +189,7 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
           Resource = concat(var.oauth_credential_provider_arn != null ? [var.oauth_credential_provider_arn] : [],
             [
               "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
-              "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${random_string.solution_prefix.result}-${var.gateway_name}-*",
+              "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${trimprefix("${local.solution_prefix}-${var.gateway_name}-*", "-")}",
               "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:token-vault/default"
             ]
           )
@@ -213,7 +213,7 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
           ]
           Resource = [
             "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
-            "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${random_string.solution_prefix.result}-${var.gateway_name}-*"
+            "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${trimprefix("${local.solution_prefix}-${var.gateway_name}-*", "-")}"
           ]
         },
         {
@@ -227,7 +227,7 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
             var.apikey_secret_arn != null ? [var.apikey_secret_arn] : [],
             [
               "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
-              "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${random_string.solution_prefix.result}-${var.gateway_name}-*",
+              "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${trimprefix("${local.solution_prefix}-${var.gateway_name}-*", "-")}",
               "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:token-vault/default"
             ]
           )

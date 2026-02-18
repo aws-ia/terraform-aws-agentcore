@@ -3,6 +3,7 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 resource "random_string" "solution_prefix" {
+  count   = var.use_solution_prefix ? 1 : 0
   length  = 4
   special = false
   upper   = false
@@ -10,7 +11,8 @@ resource "random_string" "solution_prefix" {
 }
 
 locals {
-  create_runtime = var.create_runtime
+  create_runtime  = var.create_runtime
+  solution_prefix = var.use_solution_prefix ? random_string.solution_prefix[0].result : ""
   # Sanitize runtime name to ensure it follows the regex pattern ^[a-zA-Z][a-zA-Z0-9_]{0,47}$
   sanitized_runtime_name = replace(var.runtime_name, "-", "_")
 }
@@ -42,7 +44,7 @@ data "aws_iam_policy_document" "service_linked_role" {
 # Container-based runtime
 resource "awscc_bedrockagentcore_runtime" "agent_runtime_container" {
   count              = local.create_runtime && var.runtime_artifact_type == "container" ? 1 : 0
-  agent_runtime_name = "${random_string.solution_prefix.result}_${local.sanitized_runtime_name}"
+  agent_runtime_name = trimprefix("${local.solution_prefix}_${local.sanitized_runtime_name}", "_")
   description        = var.runtime_description
   role_arn           = var.runtime_role_arn != null ? var.runtime_role_arn : aws_iam_role.runtime_role[0].arn
 
@@ -95,7 +97,7 @@ resource "awscc_bedrockagentcore_runtime" "agent_runtime_container" {
 # Code-based runtime
 resource "awscc_bedrockagentcore_runtime" "agent_runtime_code" {
   count              = local.create_runtime && var.runtime_artifact_type == "code" ? 1 : 0
-  agent_runtime_name = "${random_string.solution_prefix.result}_${local.sanitized_runtime_name}"
+  agent_runtime_name = trimprefix("${local.solution_prefix}_${local.sanitized_runtime_name}", "_")
   description        = var.runtime_description
   role_arn           = var.runtime_role_arn != null ? var.runtime_role_arn : aws_iam_role.runtime_role[0].arn
 
@@ -152,7 +154,7 @@ locals {
 # IAM Role for Agent Runtime
 resource "aws_iam_role" "runtime_role" {
   count = local.create_runtime && var.runtime_role_arn == null ? 1 : 0
-  name  = "${random_string.solution_prefix.result}-bedrock-agent-runtime-role"
+  name  = trimprefix("${local.solution_prefix}-bedrock-agent-runtime-role", "-")
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -183,7 +185,7 @@ resource "aws_iam_role" "runtime_role" {
 # Attach SLR policy to runtime role if created
 resource "aws_iam_role_policy" "runtime_slr_policy" {
   count  = local.create_runtime && var.runtime_role_arn == null ? 1 : 0
-  name   = "${random_string.solution_prefix.result}-bedrock-agent-runtime-slr-policy"
+  name   = trimprefix("${local.solution_prefix}-bedrock-agent-runtime-slr-policy", "-")
   role   = aws_iam_role.runtime_role[0].name
   policy = data.aws_iam_policy_document.service_linked_role[0].json
 }
@@ -197,7 +199,7 @@ resource "time_sleep" "iam_role_propagation" {
 
 resource "aws_iam_role_policy" "runtime_role_policy" {
   count = local.create_runtime && var.runtime_role_arn == null ? 1 : 0
-  name  = "${random_string.solution_prefix.result}-bedrock-agent-runtime-policy"
+  name  = trimprefix("${local.solution_prefix}-bedrock-agent-runtime-policy", "-")
   role  = aws_iam_role.runtime_role[0].name
 
   policy = jsonencode({
@@ -281,7 +283,7 @@ resource "aws_iam_role_policy" "runtime_role_policy" {
         ]
         Resource = [
           "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
-          "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${random_string.solution_prefix.result}_${local.sanitized_runtime_name}-*"
+          "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${trimprefix("${local.solution_prefix}_${local.sanitized_runtime_name}-*", "_")}"
         ]
       },
       {
@@ -310,7 +312,7 @@ locals {
 
 resource "awscc_bedrockagentcore_runtime_endpoint" "agent_runtime_endpoint" {
   count            = local.create_runtime_endpoint ? 1 : 0
-  name             = "${random_string.solution_prefix.result}_${local.sanitized_runtime_endpoint_name}"
+  name             = trimprefix("${local.solution_prefix}_${local.sanitized_runtime_endpoint_name}", "_")
   description      = var.runtime_endpoint_description
   agent_runtime_id = var.runtime_endpoint_agent_runtime_id != null ? var.runtime_endpoint_agent_runtime_id : local.agent_runtime_id
   tags             = var.runtime_endpoint_tags

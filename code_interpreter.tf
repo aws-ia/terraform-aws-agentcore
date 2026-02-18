@@ -150,7 +150,7 @@ locals {
 
 resource "awscc_bedrockagentcore_code_interpreter_custom" "agent_code_interpreter" {
   count              = local.create_code_interpreter ? 1 : 0
-  name               = "${random_string.solution_prefix.result}_${local.sanitized_code_interpreter_name}"
+  name               = trimprefix("${local.solution_prefix}_${local.sanitized_code_interpreter_name}", "_")
   description        = var.code_interpreter_description
   execution_role_arn = var.code_interpreter_role_arn != null ? var.code_interpreter_role_arn : aws_iam_role.code_interpreter_role[0].arn
 
@@ -175,7 +175,7 @@ resource "awscc_bedrockagentcore_code_interpreter_custom" "agent_code_interprete
 # IAM Role for Code Interpreter
 resource "aws_iam_role" "code_interpreter_role" {
   count = local.create_code_interpreter && var.code_interpreter_role_arn == null ? 1 : 0
-  name  = "${random_string.solution_prefix.result}-bedrock-agent-code-interpreter-role"
+  name  = trimprefix("${local.solution_prefix}-bedrock-agent-code-interpreter-role", "-")
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -206,7 +206,7 @@ resource "aws_iam_role" "code_interpreter_role" {
 # IAM Policy for Code Interpreter
 resource "aws_iam_role_policy" "code_interpreter_role_policy" {
   count = local.create_code_interpreter && var.code_interpreter_role_arn == null ? 1 : 0
-  name  = "${random_string.solution_prefix.result}-bedrock-agent-code-interpreter-policy"
+  name  = trimprefix("${local.solution_prefix}-bedrock-agent-code-interpreter-policy", "-")
   role  = aws_iam_role.code_interpreter_role[0].name
 
   policy = jsonencode({
