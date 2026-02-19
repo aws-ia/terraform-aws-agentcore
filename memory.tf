@@ -90,22 +90,23 @@ locals {
 }
 
 # IAM Role for Agent Memory 
+data "aws_iam_policy_document" "memory_role_assume_role" {
+  statement {
+    sid     = "AssumeRolePolicy"
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["bedrock-agentcore.amazonaws.com"]
+    }
+  }
+}
 resource "aws_iam_role" "memory_role" {
   count = local.create_memory_role ? 1 : 0
   name  = trimprefix("${local.solution_prefix}-bedrock-agent-memory-role", "-")
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "bedrock-agentcore.amazonaws.com"
-        }
-      }
-    ]
-  })
+  assume_role_policy = data.aws_iam_policy_document.memory_role_assume_role.json
 
   permissions_boundary = var.permissions_boundary_arn
   tags                 = var.memory_tags
@@ -147,42 +148,47 @@ locals {
 }
 
 # Create policy for self-managed memory strategies
+data "aws_iam_policy_document" "memory_self_managed_policy" {
+
+  # S3 bucket permissions
+  statement {
+    sid    = "S3PayloadDelivery"
+    effect = "Allow"
+
+    actions = [
+      "s3:GetBucketLocation",
+      "s3:PutObject",
+    ]
+
+    resources = flatten([
+      for bucket in local.s3_bucket_names : [
+        "arn:aws:s3:::${bucket}",
+        "arn:aws:s3:::${bucket}/*"
+      ]
+    ])
+  }
+
+  # SNS topic permissions
+  statement {
+    sid    = "SNSNotifications"
+    effect = "Allow"
+
+    actions = [
+      "sns:GetTopicAttributes",
+      "sns:Publish",
+    ]
+
+    resources = local.sns_topic_arns
+  }
+}
+
 resource "aws_iam_policy" "memory_self_managed_policy" {
   # Only create if we have a memory role AND self-managed strategies are present
   count       = local.create_memory_role && local.has_self_managed_strategies ? 1 : 0
   name        = trimprefix("${local.solution_prefix}-bedrock-agent-memory-self-managed-policy", "-")
   description = "Policy for Bedrock AgentCore self-managed memory strategies"
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      # S3 bucket permissions
-      {
-        Sid    = "S3PayloadDelivery"
-        Effect = "Allow"
-        Action = [
-          "s3:GetBucketLocation",
-          "s3:PutObject"
-        ]
-        Resource = flatten([
-          for bucket in local.s3_bucket_names : [
-            "arn:aws:s3:::${bucket}",
-            "arn:aws:s3:::${bucket}/*"
-          ]
-        ])
-      },
-      # SNS topic permissions
-      {
-        Sid    = "SNSNotifications"
-        Effect = "Allow"
-        Action = [
-          "sns:GetTopicAttributes",
-          "sns:Publish"
-        ]
-        Resource = local.sns_topic_arns
-      }
-    ]
-  })
+  policy = data.aws_iam_policy_document.memory_self_managed_policy.json
 }
 
 # Attach the self-managed policy to the memory role
@@ -194,34 +200,37 @@ resource "aws_iam_role_policy_attachment" "memory_self_managed_policy" {
 }
 
 # Create policy for KMS access when memory_encryption_key_arn is provided
+data "aws_iam_policy_document" "memory_kms_policy" {
+  count = local.create_kms_policy ? 1 : 0
+
+  statement {
+    sid    = "AllowAgentCoreMemoryKMS"
+    effect = "Allow"
+
+    actions = [
+      "kms:CreateGrant",
+      "kms:Decrypt",
+      "kms:DescribeKey",
+      "kms:GenerateDataKey",
+      "kms:GenerateDataKeyWithoutPlaintext",
+      "kms:ReEncrypt*",
+    ]
+
+    resources = [var.memory_encryption_key_arn]
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["bedrock-agentcore.*.amazonaws.com"]
+    }
+  }
+}
+
 resource "aws_iam_policy" "memory_kms_policy" {
   count       = local.create_kms_policy ? 1 : 0
   name        = trimprefix("${local.solution_prefix}-bedrock-agent-memory-kms-policy", "-")
   description = "Policy for Bedrock AgentCore memory KMS access"
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowAgentCoreMemoryKMS"
-        Effect = "Allow"
-        Action = [
-          "kms:CreateGrant",
-          "kms:Decrypt",
-          "kms:DescribeKey",
-          "kms:GenerateDataKey",
-          "kms:GenerateDataKeyWithoutPlaintext",
-          "kms:ReEncrypt*"
-        ]
-        Resource = var.memory_encryption_key_arn
-        Condition = {
-          StringEquals = {
-            "kms:ViaService" = "bedrock-agentcore.*.amazonaws.com"
-          }
-        }
-      }
-    ]
-  })
+  policy = data.aws_iam_policy_document.memory_kms_policy[0].json
 }
 
 # Attach the KMS policy to the memory role when KMS is provided and a role exists

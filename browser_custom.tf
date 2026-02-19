@@ -186,104 +186,120 @@ resource "awscc_bedrockagentcore_browser_custom" "agent_browser" {
 }
 
 # IAM Role for Browser
+data "aws_iam_policy_document" "browser_role_assume_role" {
+  statement {
+    sid     = "AssumeRolePolicy"
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["bedrock-agentcore.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:*"]
+    }
+  }
+}
+
 resource "aws_iam_role" "browser_role" {
   count = local.create_browser && var.browser_role_arn == null ? 1 : 0
   name  = trimprefix("${local.solution_prefix}-bedrock-agent-browser-role", "-")
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AssumeRolePolicy"
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "bedrock-agentcore.amazonaws.com"
-        }
-        Condition = {
-          StringEquals = {
-            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
-          }
-          ArnLike = {
-            "aws:SourceArn" = "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:*"
-          }
-        }
-      }
-    ]
-  })
+  assume_role_policy = data.aws_iam_policy_document.browser_role_assume_role.json
 
   permissions_boundary = var.permissions_boundary_arn
   tags                 = var.browser_tags
 }
 
 # IAM Policy for Browser
+data "aws_iam_policy_document" "browser_role_policy" {
+
+  statement {
+    sid    = "CloudWatchLogsAccess"
+    effect = "Allow"
+
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+      "logs:DescribeLogStreams",
+      "logs:DescribeLogGroups",
+    ]
+
+    resources = [
+      "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/bedrock-agentcore/browsers/*",
+    ]
+  }
+
+  statement {
+    sid    = "BedrockModelInvocation"
+    effect = "Allow"
+
+    actions = [
+      "bedrock:InvokeModel",
+      "bedrock:InvokeModelWithResponseStream",
+    ]
+
+    resources = [
+      "arn:aws:bedrock:*::foundation-model/*",
+      "arn:aws:bedrock:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:*",
+    ]
+  }
+
+  # Add VPC permissions if applicable
+  dynamic "statement" {
+    for_each = var.browser_network_mode == "VPC" ? [1] : []
+    content {
+      sid    = "VPCAccess"
+      effect = "Allow"
+
+      actions = [
+        "ec2:CreateNetworkInterface",
+        "ec2:DescribeNetworkInterfaces",
+        "ec2:DeleteNetworkInterface",
+      ]
+
+      resources = ["*"]
+    }
+  }
+
+  # Add S3 permissions for recording if enabled
+  dynamic "statement" {
+    for_each = var.browser_recording_enabled ? [1] : []
+    content {
+      sid    = "S3RecordingAccess"
+      effect = "Allow"
+
+      actions = [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+      ]
+
+      resources = [
+        "arn:aws:s3:::${var.browser_recording_config.bucket}",
+        "arn:aws:s3:::${var.browser_recording_config.bucket}/${var.browser_recording_config.prefix}*",
+      ]
+    }
+  }
+}
+
 resource "aws_iam_role_policy" "browser_role_policy" {
   count = local.create_browser && var.browser_role_arn == null ? 1 : 0
   name  = trimprefix("${local.solution_prefix}-bedrock-agent-browser-policy", "-")
   role  = aws_iam_role.browser_role[0].name
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = concat(
-      [
-        {
-          Sid    = "CloudWatchLogsAccess"
-          Effect = "Allow"
-          Action = [
-            "logs:CreateLogGroup",
-            "logs:CreateLogStream",
-            "logs:PutLogEvents",
-            "logs:DescribeLogStreams",
-            "logs:DescribeLogGroups"
-          ]
-          Resource = [
-            "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/bedrock-agentcore/browsers/*"
-          ]
-        },
-        {
-          Sid    = "BedrockModelInvocation"
-          Effect = "Allow"
-          Action = [
-            "bedrock:InvokeModel",
-            "bedrock:InvokeModelWithResponseStream"
-          ]
-          Resource = [
-            "arn:aws:bedrock:*::foundation-model/*",
-            "arn:aws:bedrock:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:*"
-          ]
-        },
-      ],
-      # Add VPC permissions if applicable
-      var.browser_network_mode == "VPC" ? [
-        {
-          Sid    = "VPCAccess"
-          Effect = "Allow"
-          Action = [
-            "ec2:CreateNetworkInterface",
-            "ec2:DescribeNetworkInterfaces",
-            "ec2:DeleteNetworkInterface"
-          ]
-          Resource = "*"
-        }
-      ] : [],
-      # Add S3 permissions for recording if enabled
-      var.browser_recording_enabled ? [
-        {
-          Sid    = "S3RecordingAccess"
-          Effect = "Allow"
-          Action = [
-            "s3:PutObject",
-            "s3:GetObject",
-            "s3:ListBucket"
-          ]
-          Resource = [
-            "arn:aws:s3:::${var.browser_recording_config.bucket}",
-            "arn:aws:s3:::${var.browser_recording_config.bucket}/${var.browser_recording_config.prefix}*"
-          ]
-        }
-      ] : []
-    )
-  })
+  policy = data.aws_iam_policy_document.browser_role_policy.json
 }
 
 # Add a time delay to ensure IAM role propagation

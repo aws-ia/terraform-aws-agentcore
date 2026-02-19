@@ -173,84 +173,93 @@ resource "awscc_bedrockagentcore_code_interpreter_custom" "agent_code_interprete
 }
 
 # IAM Role for Code Interpreter
+data "aws_iam_policy_document" "code_interpreter_role_assume_role" {
+  statement {
+    sid     = "AssumeRolePolicy"
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["bedrock-agentcore.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:*"]
+    }
+  }
+}
+
 resource "aws_iam_role" "code_interpreter_role" {
   count = local.create_code_interpreter && var.code_interpreter_role_arn == null ? 1 : 0
   name  = trimprefix("${local.solution_prefix}-bedrock-agent-code-interpreter-role", "-")
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AssumeRolePolicy"
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "bedrock-agentcore.amazonaws.com"
-        }
-        Condition = {
-          StringEquals = {
-            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
-          }
-          ArnLike = {
-            "aws:SourceArn" = "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:*"
-          }
-        }
-      }
-    ]
-  })
+  assume_role_policy = data.aws_iam_policy_document.code_interpreter_role_assume_role.json
 
   permissions_boundary = var.permissions_boundary_arn
   tags                 = var.code_interpreter_tags
 }
 
 # IAM Policy for Code Interpreter
+data "aws_iam_policy_document" "code_interpreter_role_policy" {
+
+  statement {
+    sid    = "CloudWatchLogsAccess"
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+      "logs:DescribeLogStreams",
+      "logs:DescribeLogGroups",
+    ]
+    resources = [
+      "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/bedrock-agentcore/code-interpreters/*",
+    ]
+  }
+
+  statement {
+    sid    = "BedrockModelInvocation"
+    effect = "Allow"
+    actions = [
+      "bedrock:InvokeModel",
+      "bedrock:InvokeModelWithResponseStream",
+    ]
+    resources = [
+      "arn:aws:bedrock:*::foundation-model/*",
+      "arn:aws:bedrock:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:*",
+    ]
+  }
+
+  # Add VPC permissions if applicable
+  dynamic "statement" {
+    for_each = var.code_interpreter_network_mode == "VPC" ? [1] : []
+    content {
+      sid    = "VPCAccess"
+      effect = "Allow"
+      actions = [
+        "ec2:CreateNetworkInterface",
+        "ec2:DescribeNetworkInterfaces",
+        "ec2:DeleteNetworkInterface",
+      ]
+      resources = ["*"]
+    }
+  }
+}
+
 resource "aws_iam_role_policy" "code_interpreter_role_policy" {
   count = local.create_code_interpreter && var.code_interpreter_role_arn == null ? 1 : 0
   name  = trimprefix("${local.solution_prefix}-bedrock-agent-code-interpreter-policy", "-")
   role  = aws_iam_role.code_interpreter_role[0].name
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = concat([
-      {
-        Sid    = "CloudWatchLogsAccess"
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "logs:DescribeLogStreams",
-          "logs:DescribeLogGroups"
-        ]
-        Resource = [
-          "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/bedrock-agentcore/code-interpreters/*"
-        ]
-      },
-      {
-        Sid    = "BedrockModelInvocation"
-        Effect = "Allow"
-        Action = [
-          "bedrock:InvokeModel",
-          "bedrock:InvokeModelWithResponseStream"
-        ]
-        Resource = [
-          "arn:aws:bedrock:*::foundation-model/*",
-          "arn:aws:bedrock:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:*"
-        ]
-      }
-      ],
-      # Add VPC permissions if applicable
-      var.code_interpreter_network_mode == "VPC" ? [{
-        Sid    = "VPCAccess"
-        Effect = "Allow"
-        Action = [
-          "ec2:CreateNetworkInterface",
-          "ec2:DescribeNetworkInterfaces",
-          "ec2:DeleteNetworkInterface"
-        ]
-        Resource = "*"
-    }] : [])
-  })
+  policy = data.aws_iam_policy_document.code_interpreter_role_policy
 }
 
 # Add a time delay to ensure IAM role propagation
