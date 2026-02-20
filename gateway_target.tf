@@ -7,7 +7,7 @@ locals {
 resource "aws_bedrockagentcore_gateway_target" "gateway_target" {
   count = local.create_gateway_target ? 1 : 0
 
-  name               = "${random_string.solution_prefix.result}-${var.gateway_target_name}"
+  name               = trimprefix("${local.solution_prefix}-${var.gateway_target_name}", "-")
   gateway_identifier = var.gateway_target_gateway_id != null ? var.gateway_target_gateway_id : try(awscc_bedrockagentcore_gateway.agent_gateway[0].gateway_identifier, null)
   description        = var.gateway_target_description
 

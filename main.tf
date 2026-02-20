@@ -3,6 +3,7 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 resource "random_string" "solution_prefix" {
+  count   = var.use_solution_prefix ? 1 : 0
   length  = 4
   special = false
   upper   = false
@@ -10,7 +11,8 @@ resource "random_string" "solution_prefix" {
 }
 
 locals {
-  create_runtime = var.create_runtime
+  create_runtime  = var.create_runtime
+  solution_prefix = var.use_solution_prefix ? random_string.solution_prefix[0].result : ""
   # Sanitize runtime name to ensure it follows the regex pattern ^[a-zA-Z][a-zA-Z0-9_]{0,47}$
   sanitized_runtime_name = replace(var.runtime_name, "-", "_")
 }
@@ -42,7 +44,7 @@ data "aws_iam_policy_document" "service_linked_role" {
 # Container-based runtime
 resource "awscc_bedrockagentcore_runtime" "agent_runtime_container" {
   count              = local.create_runtime && var.runtime_artifact_type == "container" ? 1 : 0
-  agent_runtime_name = "${random_string.solution_prefix.result}_${local.sanitized_runtime_name}"
+  agent_runtime_name = trimprefix("${local.solution_prefix}_${local.sanitized_runtime_name}", "_")
   description        = var.runtime_description
   role_arn           = var.runtime_role_arn != null ? var.runtime_role_arn : aws_iam_role.runtime_role[0].arn
 
@@ -95,7 +97,7 @@ resource "awscc_bedrockagentcore_runtime" "agent_runtime_container" {
 # Code-based runtime
 resource "awscc_bedrockagentcore_runtime" "agent_runtime_code" {
   count              = local.create_runtime && var.runtime_artifact_type == "code" ? 1 : 0
-  agent_runtime_name = "${random_string.solution_prefix.result}_${local.sanitized_runtime_name}"
+  agent_runtime_name = trimprefix("${local.solution_prefix}_${local.sanitized_runtime_name}", "_")
   description        = var.runtime_description
   role_arn           = var.runtime_role_arn != null ? var.runtime_role_arn : aws_iam_role.runtime_role[0].arn
 
@@ -146,44 +148,54 @@ resource "awscc_bedrockagentcore_runtime" "agent_runtime_code" {
 
 # Reference for agent runtime ID
 locals {
-  agent_runtime_id = var.runtime_artifact_type == "container" ? try(awscc_bedrockagentcore_runtime.agent_runtime_container[0].agent_runtime_id, null) : try(awscc_bedrockagentcore_runtime.agent_runtime_code[0].agent_runtime_id, null)
+  agent_runtime_id      = var.runtime_artifact_type == "container" ? awscc_bedrockagentcore_runtime.agent_runtime_container[0].agent_runtime_id : awscc_bedrockagentcore_runtime.agent_runtime_code[0].agent_runtime_id
+  agent_runtime_version = var.runtime_artifact_type == "container" ? awscc_bedrockagentcore_runtime.agent_runtime_container[0].agent_runtime_version : awscc_bedrockagentcore_runtime.agent_runtime_code[0].agent_runtime_version
 }
 
 # IAM Role for Agent Runtime
+data "aws_iam_policy_document" "runtime_role_assume_role_policy" {
+  count = local.create_runtime && var.runtime_role_arn == null ? 1 : 0
+
+  statement {
+    sid    = "AssumeRolePolicy"
+    effect = "Allow"
+    actions = [
+      "sts:AssumeRole",
+    ]
+
+    principals {
+      type        = "Service"
+      identifiers = ["bedrock-agentcore.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:*"]
+    }
+  }
+}
+
 resource "aws_iam_role" "runtime_role" {
   count = local.create_runtime && var.runtime_role_arn == null ? 1 : 0
-  name  = "${random_string.solution_prefix.result}-bedrock-agent-runtime-role"
+  name  = trimprefix("${local.solution_prefix}-bedrock-agent-runtime-role", "-")
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AssumeRolePolicy"
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "bedrock-agentcore.amazonaws.com"
-        }
-        Condition = {
-          StringEquals = {
-            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
-          }
-          ArnLike = {
-            "aws:SourceArn" = "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:*"
-          }
-        }
-      }
-    ]
-  })
+  assume_role_policy = data.aws_iam_policy_document.runtime_role_assume_role_policy[0].json
 
   permissions_boundary = var.permissions_boundary_arn
   tags                 = var.runtime_tags
 }
+
 # IAM Policy for Agent Runtime
 # Attach SLR policy to runtime role if created
 resource "aws_iam_role_policy" "runtime_slr_policy" {
   count  = local.create_runtime && var.runtime_role_arn == null ? 1 : 0
-  name   = "${random_string.solution_prefix.result}-bedrock-agent-runtime-slr-policy"
+  name   = trimprefix("${local.solution_prefix}-bedrock-agent-runtime-slr-policy", "-")
   role   = aws_iam_role.runtime_role[0].name
   policy = data.aws_iam_policy_document.service_linked_role[0].json
 }
@@ -195,109 +207,147 @@ resource "time_sleep" "iam_role_propagation" {
   create_duration = "20s"
 }
 
+data "aws_iam_policy_document" "runtime_role_policy" {
+  count = local.create_runtime && var.runtime_role_arn == null ? 1 : 0
+
+  statement {
+    sid    = "ECRImageAccess"
+    effect = "Allow"
+
+    actions = [
+      "ecr:BatchGetImage",
+      "ecr:GetDownloadUrlForLayer",
+    ]
+
+    resources = [
+      coalesce(
+        var.runtime_container_ecr_arn,
+        "arn:aws:ecr:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:repository/*",
+      ),
+    ]
+  }
+
+  statement {
+    sid    = "CloudWatchLogsAccess"
+    effect = "Allow"
+
+    actions = [
+      "logs:DescribeLogStreams",
+      "logs:CreateLogGroup",
+    ]
+
+    resources = [
+      "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/bedrock-agentcore/runtimes/*",
+    ]
+  }
+
+  statement {
+    sid    = "CloudWatchLogsDescribeGroups"
+    effect = "Allow"
+
+    actions = [
+      "logs:DescribeLogGroups",
+    ]
+
+    resources = [
+      "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:*",
+    ]
+  }
+
+  statement {
+    sid    = "CloudWatchLogsWriteAccess"
+    effect = "Allow"
+
+    actions = [
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
+
+    resources = [
+      "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*",
+    ]
+  }
+
+  statement {
+    sid    = "ECRTokenAccess"
+    effect = "Allow"
+
+    actions = [
+      "ecr:GetAuthorizationToken",
+    ]
+
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "XRayAccess"
+    effect = "Allow"
+
+    actions = [
+      "xray:PutTraceSegments",
+      "xray:PutTelemetryRecords",
+      "xray:GetSamplingRules",
+      "xray:GetSamplingTargets",
+    ]
+
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "AllowCloudWatchMetrics"
+    effect = "Allow"
+
+    actions = [
+      "cloudwatch:PutMetricData"
+    ]
+
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "cloudwatch:namespace"
+      values   = ["bedrock-agentcore"]
+    }
+  }
+
+  statement {
+    sid    = "GetAgentAccessToken"
+    effect = "Allow"
+
+    actions = [
+      "bedrock-agentcore:GetWorkloadAccessToken",
+      "bedrock-agentcore:GetWorkloadAccessTokenForJWT",
+      "bedrock-agentcore:GetWorkloadAccessTokenForUserId",
+    ]
+
+    resources = [
+      "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
+      "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${trimprefix("${local.solution_prefix}_${local.sanitized_runtime_name}-*", "_")}",
+    ]
+  }
+
+  statement {
+    sid    = "BedrockModelInvocation"
+    effect = "Allow"
+
+    actions = [
+      "bedrock:InvokeModel",
+      "bedrock:InvokeModelWithResponseStream",
+    ]
+
+    resources = [
+      "arn:aws:bedrock:*::foundation-model/*",
+      "arn:aws:bedrock:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:*",
+    ]
+  }
+}
+
 resource "aws_iam_role_policy" "runtime_role_policy" {
   count = local.create_runtime && var.runtime_role_arn == null ? 1 : 0
-  name  = "${random_string.solution_prefix.result}-bedrock-agent-runtime-policy"
+  name  = trimprefix("${local.solution_prefix}-bedrock-agent-runtime-policy", "-")
   role  = aws_iam_role.runtime_role[0].name
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "ECRImageAccess"
-        Effect = "Allow"
-        Action = [
-          "ecr:BatchGetImage",
-          "ecr:GetDownloadUrlForLayer"
-        ]
-        Resource = [
-          "arn:aws:ecr:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:repository/*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:DescribeLogStreams",
-          "logs:CreateLogGroup"
-        ]
-        Resource = [
-          "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/bedrock-agentcore/runtimes/*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:DescribeLogGroups"
-        ]
-        Resource = [
-          "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ]
-        Resource = [
-          "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*"
-        ]
-      },
-      {
-        Sid    = "ECRTokenAccess"
-        Effect = "Allow"
-        Action = [
-          "ecr:GetAuthorizationToken"
-        ]
-        Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "xray:PutTraceSegments",
-          "xray:PutTelemetryRecords",
-          "xray:GetSamplingRules",
-          "xray:GetSamplingTargets"
-        ]
-        Resource = "*"
-      },
-      {
-        Effect   = "Allow"
-        Resource = "*"
-        Action   = "cloudwatch:PutMetricData"
-        Condition = {
-          StringEquals = {
-            "cloudwatch:namespace" = "bedrock-agentcore"
-          }
-        }
-      },
-      {
-        Sid    = "GetAgentAccessToken"
-        Effect = "Allow"
-        Action = [
-          "bedrock-agentcore:GetWorkloadAccessToken",
-          "bedrock-agentcore:GetWorkloadAccessTokenForJWT",
-          "bedrock-agentcore:GetWorkloadAccessTokenForUserId"
-        ]
-        Resource = [
-          "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
-          "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${random_string.solution_prefix.result}_${local.sanitized_runtime_name}-*"
-        ]
-      },
-      {
-        Sid    = "BedrockModelInvocation"
-        Effect = "Allow"
-        Action = [
-          "bedrock:InvokeModel",
-          "bedrock:InvokeModelWithResponseStream"
-        ]
-        Resource = [
-          "arn:aws:bedrock:*::foundation-model/*",
-          "arn:aws:bedrock:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:*"
-        ]
-      }
-    ]
-  })
+  policy = data.aws_iam_policy_document.runtime_role_policy[0].json
 }
 
 # – Bedrock Agent Core Runtime Endpoint –
@@ -309,9 +359,10 @@ locals {
 }
 
 resource "awscc_bedrockagentcore_runtime_endpoint" "agent_runtime_endpoint" {
-  count            = local.create_runtime_endpoint ? 1 : 0
-  name             = "${random_string.solution_prefix.result}_${local.sanitized_runtime_endpoint_name}"
-  description      = var.runtime_endpoint_description
-  agent_runtime_id = var.runtime_endpoint_agent_runtime_id != null ? var.runtime_endpoint_agent_runtime_id : local.agent_runtime_id
-  tags             = var.runtime_endpoint_tags
+  count                 = local.create_runtime_endpoint ? 1 : 0
+  name                  = trimprefix("${local.solution_prefix}_${local.sanitized_runtime_endpoint_name}", "_")
+  description           = var.runtime_endpoint_description
+  agent_runtime_id      = coalesce(var.runtime_endpoint_agent_runtime_id, local.agent_runtime_id)
+  agent_runtime_version = var.runtime_endpoint_agent_runtime_version_ignore ? null : coalesce(var.runtime_endpoint_agent_runtime_version, local.agent_runtime_version)
+  tags                  = var.runtime_endpoint_tags
 }

@@ -5,7 +5,7 @@ locals {
   create_user_pool = local.create_gateway && var.gateway_authorizer_type == "CUSTOM_JWT" && var.gateway_authorizer_configuration == null
 
   # Define domain name for the User Pool
-  user_pool_domain_name = lower("${random_string.solution_prefix.result}-${var.user_pool_name}")
+  user_pool_domain_name = lower(trimprefix("${local.solution_prefix}-${var.user_pool_name}", "-"))
 
   # If User Pool is created, set the discovery URL for the gateway authorizer
   gateway_authorizer_config = local.create_user_pool ? {
@@ -28,7 +28,7 @@ resource "random_password" "password" {
 resource "aws_cognito_user_pool" "default" {
   count = local.create_user_pool ? 1 : 0
 
-  name = "${random_string.solution_prefix.result}_${var.user_pool_name}"
+  name = trimprefix("${local.solution_prefix}_${var.user_pool_name}", "_")
   username_configuration {
     case_sensitive = false
   }

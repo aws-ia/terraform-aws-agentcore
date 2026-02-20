@@ -41,6 +41,12 @@ variable "runtime_container_uri" {
   default     = null
 }
 
+variable "runtime_container_ecr_arn" {
+  description = "The ARN of the ECR repository containing the container image for the agent core runtime. Required to access an ECR located on another account."
+  type        = string
+  default     = null
+}
+
 variable "runtime_code_s3_bucket" {
   description = "S3 bucket containing the code package for the agent core runtime. Required when runtime_artifact_type is set to 'code'."
   type        = string
@@ -167,6 +173,18 @@ variable "runtime_endpoint_agent_runtime_id" {
   description = "The ID of the agent core runtime associated with the endpoint. If not provided, it will use the ID of the agent runtime created by this module."
   type        = string
   default     = null
+}
+
+variable "runtime_endpoint_agent_runtime_version" {
+  description = "The version of the agent core runtime associated with the endpoint. If not provided, it will use the version of the agent runtime created by this module."
+  type        = string
+  default     = null
+}
+
+variable "runtime_endpoint_agent_runtime_version_ignore" {
+  description = "Whether to ignore the version of the agent core runtime associated with the endpoint. If set to true, it will use the version of the agent runtime created by this module."
+  type        = bool
+  default     = false
 }
 
 variable "runtime_endpoint_tags" {
@@ -923,4 +941,10 @@ variable "user_pool_tags" {
   description = "A map of tag keys and values for the Cognito User Pool."
   type        = map(string)
   default     = null
+}
+
+variable "use_solution_prefix" {
+  description = "Whether or not to create a random string prefix for resource names to ensure uniqueness. This is useful when deploying multiple instances of this module in the same AWS account/region."
+  type        = bool
+  default     = true
 }
