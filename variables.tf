@@ -41,6 +41,12 @@ variable "runtime_container_uri" {
   default     = null
 }
 
+variable "runtime_container_ecr_arn" {
+  description = "The ARN of the ECR repository containing the container image for the agent core runtime. Required to access an ECR located on another account."
+  type        = string
+  default     = null
+}
+
 variable "runtime_code_s3_bucket" {
   description = "S3 bucket containing the code package for the agent core runtime. Required when runtime_artifact_type is set to 'code'."
   type        = string

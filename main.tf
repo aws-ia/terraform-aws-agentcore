@@ -220,7 +220,10 @@ data "aws_iam_policy_document" "runtime_role_policy" {
     ]
 
     resources = [
-      "arn:aws:ecr:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:repository/*",
+      coalesce(
+        var.runtime_container_ecr_arn,
+        "arn:aws:ecr:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:repository/*",
+      ),
     ]
   }
 
