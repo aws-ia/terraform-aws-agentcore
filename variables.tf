@@ -24,6 +24,12 @@ variable "runtime_role_arn" {
   default     = null
 }
 
+variable "runtime_additional_iam_policies" {
+  description = "List of additional IAM policies to attach to the runtime execution role (in JSON format)."
+  type        = string
+  default     = null
+}
+
 variable "runtime_artifact_type" {
   description = "The type of artifact to use for the agent core runtime. Valid values: container, code."
   type        = string

@@ -342,12 +342,21 @@ data "aws_iam_policy_document" "runtime_role_policy" {
   }
 }
 
+data "aws_iam_policy_document" "runtime_role_policy_merged" {
+  count = local.create_runtime && var.runtime_role_arn == null ? 1 : 0
+
+  source_policy_documents = compact([
+    data.aws_iam_policy_document.runtime_role_policy[0].json,
+    var.runtime_additional_iam_policies,
+  ])
+}
+
 resource "aws_iam_role_policy" "runtime_role_policy" {
   count = local.create_runtime && var.runtime_role_arn == null ? 1 : 0
   name  = trimprefix("${local.solution_prefix}-bedrock-agent-runtime-policy", "-")
   role  = aws_iam_role.runtime_role[0].name
 
-  policy = data.aws_iam_policy_document.runtime_role_policy[0].json
+  policy = data.aws_iam_policy_document.runtime_role_policy_merged[0].json
 }
 
 # – Bedrock Agent Core Runtime Endpoint –
