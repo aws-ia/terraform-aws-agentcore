@@ -143,9 +143,7 @@ data "aws_iam_policy_document" "runtime_policy" {
         "ecr:GetDownloadUrlForLayer",
         "ecr:BatchGetImage"
       ]
-      resources = [
-        coalesce(each.value.container_ecr_arn, "*"),
-      ]
+      resources = ["*"]
     }
   }
 }
