@@ -170,6 +170,46 @@ resource "aws_bedrockagentcore_gateway_target" "gateway_target" {
           endpoint = var.gateway_target_mcp_server_config.endpoint
         }
       }
+
+      dynamic "open_api_schema" {
+        for_each = var.gateway_target_type == "OPEN_API_SCHEMA" && var.gateway_target_open_api_schema_config != null ? [1] : []
+
+        content {
+          dynamic "inline_payload" {
+            for_each = var.gateway_target_open_api_schema_config.inline_payload != null ? [1] : []
+            content {
+              payload = var.gateway_target_open_api_schema_config.inline_payload.payload
+            }
+          }
+          dynamic "s3" {
+            for_each = var.gateway_target_open_api_schema_config.s3 != null ? [1] : []
+            content {
+              uri                     = var.gateway_target_open_api_schema_config.s3.uri
+              bucket_owner_account_id = var.gateway_target_open_api_schema_config.s3.bucket_owner_account_id
+            }
+          }
+        }
+      }
+
+      dynamic "smithy_model" {
+        for_each = var.gateway_target_type == "SMITHY_MODEL" && var.gateway_target_smithy_model_config != null ? [1] : []
+
+        content {
+          dynamic "inline_payload" {
+            for_each = var.gateway_target_smithy_model_config.inline_payload != null ? [1] : []
+            content {
+              payload = var.gateway_target_smithy_model_config.inline_payload.payload
+            }
+          }
+          dynamic "s3" {
+            for_each = var.gateway_target_smithy_model_config.s3 != null ? [1] : []
+            content {
+              uri                     = var.gateway_target_smithy_model_config.s3.uri
+              bucket_owner_account_id = var.gateway_target_smithy_model_config.s3.bucket_owner_account_id
+            }
+          }
+        }
+      }
     }
   }
 }

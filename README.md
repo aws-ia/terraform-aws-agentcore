@@ -481,7 +481,7 @@ The Browser construct supports the following network modes:
 - Enables full web browsing capabilities
 - VPC mode is not supported with this option
 
-2. VPC (Virtual Private Cloud)
+1. VPC (Virtual Private Cloud)
 
 - Select whether to run the browser in a virtual private cloud (VPC).
 - By configuring VPC connectivity, you enable secure access to private resources such as databases, internal APIs, and services within your VPC.
@@ -646,6 +646,133 @@ module "agentcore" {
 }
 ```
 
+#### Gateway Target with OpenAPI Schema
+
+```hcl
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.3"
+
+  # Create a gateway target with OpenAPI schema
+  create_gateway_target = true
+  gateway_target_name = "OpenAPITarget"
+
+  # Configure OpenAPI Schema target with inline payload
+  gateway_target_type = "OPEN_API_SCHEMA"
+  gateway_target_open_api_schema_config = {
+    inline_payload = {
+      payload = <<-EOT
+        {
+          "openapi": "3.0.0",
+          "info": {
+            "title": "Example API",
+            "version": "1.0.0"
+          },
+          "paths": {
+            "/api/resource": {
+              "get": {
+                "summary": "Get resource",
+                "responses": {
+                  "200": {
+                    "description": "Success"
+                  }
+                }
+              }
+            }
+          }
+        }
+      EOT
+    }
+  }
+}
+```
+
+Alternatively, you can store the OpenAPI schema in S3:
+
+```hcl
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.3"
+
+  # Create a gateway target with OpenAPI schema from S3
+  create_gateway_target = true
+  gateway_target_name = "OpenAPITargetFromS3"
+
+  # Configure OpenAPI Schema target with S3 location
+  gateway_target_type = "OPEN_API_SCHEMA"
+  gateway_target_open_api_schema_config = {
+    s3 = {
+      uri = "s3://my-bucket/openapi-schema.json"
+      bucket_owner_account_id = "123456789012"  # Optional, for cross-account access
+    }
+  }
+}
+```
+
+#### Gateway Target with Smithy Model
+
+```hcl
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.3"
+
+  # Create a gateway target with Smithy model
+  create_gateway_target = true
+  gateway_target_name = "SmithyModelTarget"
+
+  # Configure Smithy Model target with inline payload
+  gateway_target_type = "SMITHY_MODEL"
+  gateway_target_smithy_model_config = {
+    inline_payload = {
+      payload = <<-EOT
+        $version: "2"
+        namespace example.api
+
+        service ExampleService {
+          version: "1.0.0"
+          operations: [GetResource]
+        }
+
+        operation GetResource {
+          input: GetResourceInput
+          output: GetResourceOutput
+        }
+
+        structure GetResourceInput {
+          resourceId: String
+        }
+
+        structure GetResourceOutput {
+          data: String
+        }
+      EOT
+    }
+  }
+}
+```
+
+Alternatively, you can store the Smithy model in S3:
+
+```hcl
+module "agentcore" {
+  source  = "aws-ia/agentcore/aws"
+  version = "0.0.3"
+
+  # Create a gateway target with Smithy model from S3
+  create_gateway_target = true
+  gateway_target_name = "SmithyModelTargetFromS3"
+
+  # Configure Smithy Model target with S3 location
+  gateway_target_type = "SMITHY_MODEL"
+  gateway_target_smithy_model_config = {
+    s3 = {
+      uri = "s3://my-bucket/smithy-model.smithy"
+      bucket_owner_account_id = "123456789012"  # Optional, for cross-account access
+    }
+  }
+}
+```
+
 ### AgentCore Workload Identity
 
 The Amazon Bedrock AgentCore Workload Identity enables you to manage identity configurations for resources such as AgentCore runtime and AgentCore gateway. Workload identities provide secure access management and OAuth2 integration capabilities for your Bedrock AI applications.
@@ -687,13 +814,13 @@ The Code Interpreter construct supports the following network modes:
 - Suitable for development and testing environments
 - Enables downloading Python packages from PyPI
 
-2. Sandbox Network Mode
+1. Sandbox Network Mode
 
 - Isolated network environment with no internet access
 - Suitable for production environments with strict security requirements
 - Only allows access to pre-installed packages and local resources
 
-3. VPC (Virtual Private Cloud)
+1. VPC (Virtual Private Cloud)
 
 - Select whether to run the browser in a virtual private cloud (VPC).
 - By configuring VPC connectivity, you enable secure access to private resources such as databases, internal APIs, and services within your VPC.

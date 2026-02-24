@@ -771,13 +771,13 @@ variable "gateway_target_oauth_config" {
 }
 
 variable "gateway_target_type" {
-  description = "Type of target to create. Valid values: LAMBDA, MCP_SERVER."
+  description = "Type of target to create. Valid values: LAMBDA, MCP_SERVER, OPEN_API_SCHEMA, SMITHY_MODEL."
   type        = string
   default     = "LAMBDA"
 
   validation {
-    condition     = var.gateway_target_type == null || contains(["LAMBDA", "MCP_SERVER"], var.gateway_target_type)
-    error_message = "The gateway_target_type must be one of LAMBDA, MCP_SERVER, or null."
+    condition     = var.gateway_target_type == null || contains(["LAMBDA", "MCP_SERVER", "OPEN_API_SCHEMA", "SMITHY_MODEL"], var.gateway_target_type)
+    error_message = "The gateway_target_type must be one of LAMBDA, MCP_SERVER, OPEN_API_SCHEMA, SMITHY_MODEL, or null."
   }
 }
 
@@ -840,6 +840,34 @@ variable "gateway_target_mcp_server_config" {
   description = "Configuration for MCP server target."
   type = object({
     endpoint = string
+  })
+  default = null
+}
+
+variable "gateway_target_open_api_schema_config" {
+  description = "Configuration for OpenAPI schema target."
+  type = object({
+    inline_payload = optional(object({
+      payload = string
+    }))
+    s3 = optional(object({
+      uri                     = string
+      bucket_owner_account_id = optional(string)
+    }))
+  })
+  default = null
+}
+
+variable "gateway_target_smithy_model_config" {
+  description = "Configuration for Smithy model target."
+  type = object({
+    inline_payload = optional(object({
+      payload = string
+    }))
+    s3 = optional(object({
+      uri                     = string
+      bucket_owner_account_id = optional(string)
+    }))
   })
   default = null
 }
