@@ -5,8 +5,8 @@ resource "random_string" "bucket_suffix" {
   for_each = {
     for name, config in var.runtimes :
     name => config
-    if (config.source_type == "CODE" && config.code_source_path != null) ||
-       (config.source_type == "CONTAINER" && config.container_source_path != null)
+    if(config.source_type == "CODE" && config.code_source_path != null) ||
+    (config.source_type == "CONTAINER" && config.container_source_path != null)
   }
 
   length  = 8
@@ -18,8 +18,8 @@ resource "aws_s3_bucket" "runtime" {
   for_each = {
     for name, config in var.runtimes :
     name => config
-    if (config.source_type == "CODE" && config.code_source_path != null) ||
-       (config.source_type == "CONTAINER" && config.container_source_path != null)
+    if(config.source_type == "CODE" && config.code_source_path != null) ||
+    (config.source_type == "CONTAINER" && config.container_source_path != null)
   }
 
   bucket        = "${var.project_prefix}-${replace(each.key, "_", "-")}-${each.value.source_type == "CODE" ? "code" : "builds"}-${random_string.bucket_suffix[each.key].result}"

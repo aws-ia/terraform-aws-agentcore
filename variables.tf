@@ -51,11 +51,13 @@ variable "runtimes" {
 
     # CONTAINER: User-managed (provide image_uri)
     container_image_uri = optional(string)
+    container_ecr_arn   = optional(string) # Required if container_image_uri is provided and the ECR repo is in a different account
 
     # Shared configuration
-    execution_role_arn     = optional(string) # Required for user-managed
-    description            = optional(string)
-    execution_network_mode = optional(string, "PUBLIC")
+    execution_role_arn               = optional(string) # Required for user-managed
+    execution_additional_policy_json = optional(string) # Additional IAM policies to attach to the execution role (in JSON format)
+    description                      = optional(string)
+    execution_network_mode           = optional(string, "PUBLIC")
     execution_network_config = optional(object({
       security_groups = list(string)
       subnets         = list(string)
@@ -146,6 +148,7 @@ variable "runtimes" {
     error_message = "execution_network_config is required when execution_network_mode is VPC."
   }
 }
+
 variable "runtime_additional_iam_policies" {
   description = "List of additional IAM policies to attach to the runtime execution role (in JSON format)."
   type        = string
@@ -317,7 +320,7 @@ variable "gateway_targets" {
       custom_parameters = optional(map(string))
     }))
 
-    type = string # "LAMBDA" or "MCP_SERVER"
+    type = string # "LAMBDA", "MCP_SERVER", "OPEN_API_SCHEMA", or "SMITHY_MODEL"
 
     lambda_config = optional(object({
       lambda_arn       = string
@@ -350,6 +353,26 @@ variable "gateway_targets" {
 
     mcp_server_config = optional(object({
       endpoint = string
+    }))
+
+    open_api_schema_config = optional(object({
+      inline_payload = optional(object({
+        payload = string
+      }))
+      s3 = optional(object({
+        uri                     = string
+        bucket_owner_account_id = optional(string)
+      }))
+    }))
+
+    smithy_model_config = optional(object({
+      inline_payload = optional(object({
+        payload = string
+      }))
+      s3 = optional(object({
+        uri                     = string
+        bucket_owner_account_id = optional(string)
+      }))
     }))
   }))
   default = {}

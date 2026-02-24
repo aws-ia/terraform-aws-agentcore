@@ -53,7 +53,7 @@ output "s3_bucket_names" {
 
 output "codebuild_project_names" {
   description = "Map of CONTAINER runtime names to their CodeBuild project names"
-  value       = merge(
+  value = merge(
     { for k, v in aws_codebuild_project.runtime_container : k => v.name },
     { for k, v in aws_codebuild_project.runtime_code : k => v.name }
   )

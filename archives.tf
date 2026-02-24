@@ -6,8 +6,8 @@ data "archive_file" "runtime_source" {
   for_each = {
     for name, config in var.runtimes :
     name => config
-    if (config.source_type == "CODE" && config.code_source_path != null) ||
-       (config.source_type == "CONTAINER" && config.container_source_path != null)
+    if(config.source_type == "CODE" && config.code_source_path != null) ||
+    (config.source_type == "CONTAINER" && config.container_source_path != null)
   }
 
   type        = "zip"

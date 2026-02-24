@@ -7,13 +7,13 @@
 resource "awscc_bedrockagentcore_gateway" "gateway" {
   for_each = var.gateways
 
-  name             = each.key
-  description      = each.value.description
-  role_arn         = each.value.role_arn != null ? each.value.role_arn : aws_iam_role.gateway[each.key].arn
-  authorizer_type  = each.value.authorizer_type
-  protocol_type    = each.value.protocol_type
-  exception_level  = each.value.exception_level
-  kms_key_arn      = each.value.kms_key_arn
+  name            = each.key
+  description     = each.value.description
+  role_arn        = each.value.role_arn != null ? each.value.role_arn : aws_iam_role.gateway[each.key].arn
+  authorizer_type = each.value.authorizer_type
+  protocol_type   = each.value.protocol_type
+  exception_level = each.value.exception_level
+  kms_key_arn     = each.value.kms_key_arn
 
   authorizer_configuration = each.value.authorizer_type == "CUSTOM_JWT" && each.value.authorizer_configuration != null ? {
     custom_jwt_authorizer = {
@@ -191,6 +191,46 @@ resource "aws_bedrockagentcore_gateway_target" "gateway_target" {
         for_each = each.value.type == "MCP_SERVER" && each.value.mcp_server_config != null ? [1] : []
         content {
           endpoint = each.value.mcp_server_config.endpoint
+        }
+      }
+
+      dynamic "open_api_schema" {
+        for_each = each.value.type == "OPEN_API_SCHEMA" && each.value.open_api_schema_config != null ? [1] : []
+
+        content {
+          dynamic "inline_payload" {
+            for_each = each.value.open_api_schema_config.inline_payload != null ? [1] : []
+            content {
+              payload = each.value.open_api_schema_config.inline_payload.payload
+            }
+          }
+          dynamic "s3" {
+            for_each = each.value.open_api_schema_config.s3 != null ? [1] : []
+            content {
+              uri                     = each.value.open_api_schema_config.s3.uri
+              bucket_owner_account_id = each.value.open_api_schema_config.s3.bucket_owner_account_id
+            }
+          }
+        }
+      }
+
+      dynamic "smithy_model" {
+        for_each = each.value.type == "SMITHY_MODEL" && each.value.smithy_model_config != null ? [1] : []
+
+        content {
+          dynamic "inline_payload" {
+            for_each = each.value.smithy_model_config.inline_payload != null ? [1] : []
+            content {
+              payload = each.value.smithy_model_config.inline_payload.payload
+            }
+          }
+          dynamic "s3" {
+            for_each = each.value.smithy_model_config.s3 != null ? [1] : []
+            content {
+              uri                     = each.value.smithy_model_config.s3.uri
+              bucket_owner_account_id = each.value.smithy_model_config.s3.bucket_owner_account_id
+            }
+          }
         }
       }
     }

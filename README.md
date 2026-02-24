@@ -146,6 +146,118 @@ module "agentcore" {
 }
 ```
 
+## Basic Usage - Create Gateway Target with Lambda
+
+```hcl
+module "agentcore" {
+  source = "aws-ia/agentcore/aws"
+
+  # First create a gateway
+  gateways = {
+    my_gateway = {
+      description   = "Gateway for external tools"
+      protocol_type = "MCP"
+    }
+  }
+
+  # Then create a gateway target
+  gateway_targets = {
+    lambda_target = {
+      gateway_name = "my_gateway"
+      description  = "Lambda function target"
+      type         = "LAMBDA"
+      lambda_config = {
+        lambda_arn       = "arn:aws:lambda:us-east-1:123456789012:function:my-function"
+        tool_schema_type = "INLINE"
+        inline_schema = {
+          name        = "process_data"
+          description = "Process data using Lambda"
+          input_schema = {
+            type        = "string"
+            description = "Input data to process"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## Basic Usage - Create Gateway Target with OpenAPI Schema
+
+```hcl
+module "agentcore" {
+  source = "aws-ia/agentcore/aws"
+
+  gateways = {
+    api_gateway = {
+      description   = "Gateway for REST APIs"
+      protocol_type = "MCP"
+    }
+  }
+
+  gateway_targets = {
+    openapi_target = {
+      gateway_name = "api_gateway"
+      description  = "REST API via OpenAPI schema"
+      type         = "OPEN_API_SCHEMA"
+      open_api_schema_config = {
+        inline_payload = {
+          payload = jsonencode({
+            openapi = "3.0.0"
+            info = {
+              title   = "Example API"
+              version = "1.0.0"
+            }
+            paths = {
+              "/api/resource" = {
+                get = {
+                  summary = "Get resource"
+                  responses = {
+                    "200" = {
+                      description = "Success"
+                    }
+                  }
+                }
+              }
+            }
+          })
+        }
+      }
+    }
+  }
+}
+```
+
+## Basic Usage - Create Gateway Target with Smithy Model
+
+```hcl
+module "agentcore" {
+  source = "aws-ia/agentcore/aws"
+
+  gateways = {
+    smithy_gateway = {
+      description   = "Gateway for Smithy services"
+      protocol_type = "MCP"
+    }
+  }
+
+  gateway_targets = {
+    smithy_target = {
+      gateway_name = "smithy_gateway"
+      description  = "Service via Smithy model"
+      type         = "SMITHY_MODEL"
+      smithy_model_config = {
+        s3 = {
+          uri                     = "s3://my-bucket/models/service.smithy"
+          bucket_owner_account_id = "123456789012"
+        }
+      }
+    }
+  }
+}
+```
+
 ## Examples
 
 The module includes several examples demonstrating different use cases:
@@ -258,7 +370,7 @@ No modules.
 | <a name="input_browsers"></a> [browsers](#input\_browsers) | Map of AgentCore custom browsers to create. Each key is the browser name. | <pre>map(object({<br/>    description          = optional(string)<br/>    execution_role_arn   = optional(string)<br/>    network_mode         = optional(string, "PUBLIC")<br/>    <br/>    network_configuration = optional(object({<br/>      security_groups = list(string)<br/>      subnets         = list(string)<br/>    }))<br/>    <br/>    recording_enabled = optional(bool, false)<br/>    <br/>    recording_config = optional(object({<br/>      bucket = string<br/>      prefix = string<br/>    }))<br/>    <br/>    tags = optional(map(string))<br/>  }))</pre> | `{}` | no |
 | <a name="input_code_interpreters"></a> [code\_interpreters](#input\_code\_interpreters) | Map of AgentCore custom code interpreters to create. Each key is the interpreter name. | <pre>map(object({<br/>    description          = optional(string)<br/>    execution_role_arn   = optional(string)<br/>    network_mode         = optional(string, "SANDBOX")<br/>    <br/>    network_configuration = optional(object({<br/>      security_groups = list(string)<br/>      subnets         = list(string)<br/>    }))<br/>    <br/>    tags = optional(map(string))<br/>  }))</pre> | `{}` | no |
 | <a name="input_debug"></a> [debug](#input\_debug) | Enable debug mode: generates .env files with actual resource IDs in code\_source\_path directories for local testing. | `bool` | `false` | no |
-| <a name="input_gateway_targets"></a> [gateway\_targets](#input\_gateway\_targets) | Map of AgentCore gateway targets to create. Each key is the target name. | <pre>map(object({<br/>    gateway_name                = string<br/>    description                 = optional(string)<br/>    credential_provider_type    = optional(string)<br/>    <br/>    api_key_config = optional(object({<br/>      provider_arn              = string<br/>      credential_location       = string<br/>      credential_parameter_name = string<br/>      credential_prefix         = optional(string)<br/>    }))<br/>    <br/>    oauth_config = optional(object({<br/>      provider_arn      = string<br/>      scopes            = optional(list(string))<br/>      custom_parameters = optional(map(string))<br/>    }))<br/>    <br/>    type = string # "LAMBDA" or "MCP_SERVER"<br/>    <br/>    lambda_config = optional(object({<br/>      lambda_arn       = string<br/>      tool_schema_type = string # "INLINE" or "S3"<br/>      <br/>      inline_schema = optional(object({<br/>        name        = string<br/>        description = optional(string)<br/>        <br/>        input_schema = object({<br/>          type        = string<br/>          description = optional(string)<br/>          properties  = optional(list(any))<br/>          items       = optional(any)<br/>        })<br/>        <br/>        output_schema = optional(object({<br/>          type        = string<br/>          description = optional(string)<br/>          properties  = optional(list(any))<br/>          items       = optional(any)<br/>        }))<br/>      }))<br/>      <br/>      s3_schema = optional(object({<br/>        uri                     = string<br/>        bucket_owner_account_id = optional(string)<br/>      }))<br/>    }))<br/>    <br/>    mcp_server_config = optional(object({<br/>      endpoint = string<br/>    }))<br/>  }))</pre> | `{}` | no |
+| <a name="input_gateway_targets"></a> [gateway\_targets](#input\_gateway\_targets) | Map of AgentCore gateway targets to create. Each key is the target name. | <pre>map(object({<br/>    gateway_name                = string<br/>    description                 = optional(string)<br/>    credential_provider_type    = optional(string)<br/>    <br/>    api_key_config = optional(object({<br/>      provider_arn              = string<br/>      credential_location       = string<br/>      credential_parameter_name = string<br/>      credential_prefix         = optional(string)<br/>    }))<br/>    <br/>    oauth_config = optional(object({<br/>      provider_arn      = string<br/>      scopes            = optional(list(string))<br/>      custom_parameters = optional(map(string))<br/>    }))<br/>    <br/>    type = string # "LAMBDA", "MCP_SERVER", "OPEN_API_SCHEMA", or "SMITHY_MODEL"<br/>    <br/>    lambda_config = optional(object({<br/>      lambda_arn       = string<br/>      tool_schema_type = string # "INLINE" or "S3"<br/>      <br/>      inline_schema = optional(object({<br/>        name        = string<br/>        description = optional(string)<br/>        <br/>        input_schema = object({<br/>          type        = string<br/>          description = optional(string)<br/>          properties  = optional(list(any))<br/>          items       = optional(any)<br/>        })<br/>        <br/>        output_schema = optional(object({<br/>          type        = string<br/>          description = optional(string)<br/>          properties  = optional(list(any))<br/>          items       = optional(any)<br/>        }))<br/>      }))<br/>      <br/>      s3_schema = optional(object({<br/>        uri                     = string<br/>        bucket_owner_account_id = optional(string)<br/>      }))<br/>    }))<br/>    <br/>    mcp_server_config = optional(object({<br/>      endpoint = string<br/>    }))<br/>    <br/>    open_api_schema_config = optional(object({<br/>      inline_payload = optional(object({<br/>        payload = string<br/>      }))<br/>      s3 = optional(object({<br/>        uri                     = string<br/>        bucket_owner_account_id = optional(string)<br/>      }))<br/>    }))<br/>    <br/>    smithy_model_config = optional(object({<br/>      inline_payload = optional(object({<br/>        payload = string<br/>      }))<br/>      s3 = optional(object({<br/>        uri                     = string<br/>        bucket_owner_account_id = optional(string)<br/>      }))<br/>    }))<br/>  }))</pre> | `{}` | no |
 | <a name="input_gateways"></a> [gateways](#input\_gateways) | Map of AgentCore gateways to create. Each key is the gateway name. | <pre>map(object({<br/>    description      = optional(string)<br/>    role_arn         = optional(string)<br/>    authorizer_type  = optional(string, "AWS_IAM")<br/>    protocol_type    = optional(string, "MCP")<br/>    exception_level  = optional(string, "DEBUG")<br/>    kms_key_arn      = optional(string)<br/>    <br/>    authorizer_configuration = optional(object({<br/>      custom_jwt_authorizer = object({<br/>        allowed_audience = list(string)<br/>        allowed_clients  = optional(list(string))<br/>        discovery_url    = string<br/>      })<br/>    }))<br/>    <br/>    protocol_configuration = optional(object({<br/>      mcp = object({<br/>        instructions       = optional(string)<br/>        search_type        = optional(string, "SEMANTIC")<br/>        supported_versions = optional(list(string), ["1.0.0"])<br/>      })<br/>    }))<br/>    <br/>    interceptor_configurations = optional(list(object({<br/>      interception_points = list(string)<br/>      interceptor = object({<br/>        lambda = object({<br/>          arn = string<br/>        })<br/>      })<br/>      input_configuration = optional(object({<br/>        pass_request_headers = optional(bool, false)<br/>      }))<br/>    })), [])<br/>    <br/>    tags = optional(map(string))<br/>  }))</pre> | `{}` | no |
 | <a name="input_memories"></a> [memories](#input\_memories) | Map of AgentCore memories to create. Each key is the memory name. NOTE: Each memory can only have ONE strategy. | <pre>map(object({<br/>    description           = optional(string)<br/>    event_expiry_duration = optional(number, 90)<br/>    execution_role_arn    = optional(string)<br/>    encryption_key_arn    = optional(string)<br/>    <br/>    strategies = optional(list(object({<br/>      semantic_memory_strategy = optional(object({<br/>        name        = optional(string)<br/>        description = optional(string)<br/>        namespaces  = optional(list(string))<br/>      }))<br/>      summary_memory_strategy = optional(object({<br/>        name        = optional(string)<br/>        description = optional(string)<br/>        namespaces  = optional(list(string))<br/>      }))<br/>      user_preference_memory_strategy = optional(object({<br/>        name        = optional(string)<br/>        description = optional(string)<br/>        namespaces  = optional(list(string))<br/>      }))<br/>      custom_memory_strategy = optional(object({<br/>        name        = optional(string)<br/>        description = optional(string)<br/>        namespaces  = optional(list(string))<br/>        configuration = optional(object({<br/>          self_managed_configuration = optional(object({<br/>            historical_context_window_size = optional(number, 4)<br/>            invocation_configuration = object({<br/>              payload_delivery_bucket_name = string<br/>              topic_arn                    = string<br/>            })<br/>            trigger_conditions = optional(list(object({<br/>              message_based_trigger = optional(object({<br/>                message_count = optional(number, 1)<br/>              }))<br/>              time_based_trigger = optional(object({<br/>                idle_session_timeout = optional(number, 10)<br/>              }))<br/>              token_based_trigger = optional(object({<br/>                token_count = optional(number, 100)<br/>              }))<br/>            })))<br/>          }))<br/>          semantic_override = optional(object({<br/>            consolidation = optional(object({<br/>              append_to_prompt = optional(string)<br/>              model_id         = optional(string)<br/>            }))<br/>            extraction = optional(object({<br/>              append_to_prompt = optional(string)<br/>              model_id         = optional(string)<br/>            }))<br/>          }))<br/>          summary_override = optional(object({<br/>            consolidation = optional(object({<br/>              append_to_prompt = optional(string)<br/>              model_id         = optional(string)<br/>            }))<br/>          }))<br/>          user_preference_override = optional(object({<br/>            consolidation = optional(object({<br/>              append_to_prompt = optional(string)<br/>              model_id         = optional(string)<br/>            }))<br/>            extraction = optional(object({<br/>              append_to_prompt = optional(string)<br/>              model_id         = optional(string)<br/>            }))<br/>          }))<br/>        }))<br/>      }))<br/>    })), [])<br/>    <br/>    tags = optional(map(string))<br/>  }))</pre> | `{}` | no |
 | <a name="input_project_prefix"></a> [project\_prefix](#input\_project\_prefix) | Prefix for all AWS resource names created by this module. Helps identify and organize resources. | `string` | `"agentcore"` | no |
