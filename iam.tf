@@ -36,9 +36,9 @@ resource "aws_iam_role" "runtime" {
     if config.execution_role_arn == null
   }
 
-  name                 = "${var.project_prefix}-${each.key}-runtime"
-  assume_role_policy   = data.aws_iam_policy_document.runtime_assume_role.json
-  tags                 = local.merged_tags
+  name               = "${var.project_prefix}-${each.key}-runtime"
+  assume_role_policy = data.aws_iam_policy_document.runtime_assume_role.json
+  tags               = local.merged_tags
 }
 
 # Wait for IAM role propagation
@@ -54,7 +54,7 @@ resource "aws_iam_role_policy" "runtime" {
   for_each = aws_iam_role.runtime
 
   role   = each.value.name
-  policy = data.aws_iam_policy_document.runtime_policy[each.key].json
+  policy = data.aws_iam_policy_document.runtime_policy_merged[each.key].json
 }
 
 data "aws_iam_policy_document" "runtime_policy" {
@@ -72,7 +72,7 @@ data "aws_iam_policy_document" "runtime_policy" {
       "logs:CreateLogStream",
       "logs:PutLogEvents"
     ]
-    resources = ["arn:aws:logs:*:*:log-group:/aws/bedrock/agentcore/*"]
+    resources = ["arn:aws:logs:*:*:log-group:/aws/bedrock-agentcore/*"]
   }
 
   statement {
@@ -86,14 +86,17 @@ data "aws_iam_policy_document" "runtime_policy" {
   }
 
   statement {
-    sid    = "AllowCloudWatchMetrics"
-    effect = "Allow"
-    actions = ["cloudwatch:PutMetricData"]
+    sid       = "AllowCloudWatchMetrics"
+    effect    = "Allow"
+    actions   = ["cloudwatch:PutMetricData"]
     resources = ["*"]
     condition {
       test     = "StringEquals"
       variable = "cloudwatch:namespace"
-      values   = ["AWS/Bedrock/AgentCore"]
+      values = [
+        "AWS/Bedrock/AgentCore",
+        "AWS/Bedrock-AgentCore",
+      ]
     }
   }
 
@@ -146,6 +149,19 @@ data "aws_iam_policy_document" "runtime_policy" {
       resources = ["*"]
     }
   }
+}
+
+data "aws_iam_policy_document" "runtime_policy_merged" {
+  for_each = {
+    for name, config in var.runtimes :
+    name => config
+    if config.execution_role_arn == null
+  }
+
+  source_policy_documents = compact([
+    data.aws_iam_policy_document.runtime_policy[each.key].json,
+    each.value.execution_additional_policy_json,
+  ])
 }
 
 # CodeBuild IAM roles for CONTAINER runtimes
@@ -371,9 +387,9 @@ data "aws_iam_policy_document" "gateway_policy" {
   dynamic "statement" {
     for_each = length([for k, v in var.gateway_targets : v if v.gateway_name == each.key && v.type == "LAMBDA"]) > 0 ? [1] : []
     content {
-      sid       = "AllowLambdaInvocation"
-      effect    = "Allow"
-      actions   = ["lambda:InvokeFunction"]
+      sid     = "AllowLambdaInvocation"
+      effect  = "Allow"
+      actions = ["lambda:InvokeFunction"]
       resources = [
         for k, v in var.gateway_targets :
         v.lambda_config.lambda_arn
@@ -477,7 +493,7 @@ data "aws_iam_policy_document" "browser_policy" {
       "logs:CreateLogStream",
       "logs:PutLogEvents"
     ]
-    resources = ["arn:aws:logs:*:*:log-group:/aws/bedrock/agentcore/*"]
+    resources = ["arn:aws:logs:*:*:log-group:/aws/bedrock-agentcore/*"]
   }
 
   dynamic "statement" {
@@ -552,6 +568,6 @@ data "aws_iam_policy_document" "code_interpreter_policy" {
       "logs:CreateLogStream",
       "logs:PutLogEvents"
     ]
-    resources = ["arn:aws:logs:*:*:log-group:/aws/bedrock/agentcore/*"]
+    resources = ["arn:aws:logs:*:*:log-group:/aws/bedrock-agentcore/*"]
   }
 }

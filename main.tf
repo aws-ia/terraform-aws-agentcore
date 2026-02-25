@@ -86,12 +86,11 @@ resource "awscc_bedrockagentcore_runtime_endpoint" "runtime" {
     if config.create_endpoint
   }
 
-  name             = "${each.key}_endpoint"
-  description      = each.value.endpoint_description
+  name        = "${each.key}_endpoint"
+  description = each.value.endpoint_description
   agent_runtime_id = try(
     awscc_bedrockagentcore_runtime.runtime_code[each.key].agent_runtime_id,
     awscc_bedrockagentcore_runtime.runtime_container[each.key].agent_runtime_id
   )
   tags = merge(local.merged_tags, each.value.tags)
 }
-

@@ -41,6 +41,14 @@ output "runtime_role_arns" {
   value       = { for k, v in aws_iam_role.runtime : k => v.arn }
 }
 
+output "runtime_workload_identity_details" {
+  description = "Map of runtime names to their workload identity details (if applicable)"
+  value = merge(
+    { for k, v in awscc_bedrockagentcore_runtime.runtime_code : k => v.workload_identity_details },
+    { for k, v in awscc_bedrockagentcore_runtime.runtime_container : k => v.workload_identity_details },
+  )
+}
+
 output "ecr_repository_urls" {
   description = "Map of CONTAINER runtime names to their ECR repository URLs"
   value       = { for k, v in aws_ecr_repository.runtime : k => v.repository_url }
@@ -53,7 +61,7 @@ output "s3_bucket_names" {
 
 output "codebuild_project_names" {
   description = "Map of CONTAINER runtime names to their CodeBuild project names"
-  value       = merge(
+  value = merge(
     { for k, v in aws_codebuild_project.runtime_container : k => v.name },
     { for k, v in aws_codebuild_project.runtime_code : k => v.name }
   )
