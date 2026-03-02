@@ -325,7 +325,7 @@ resource "aws_iam_role" "gateway" {
   }
 
   name               = "${var.project_prefix}-${each.key}-gateway"
-  assume_role_policy = data.aws_iam_policy_document.gateway_assume_role.json
+  assume_role_policy = data.aws_iam_policy_document.gateway_assume_role_merged[each.key].json
   tags               = local.merged_tags
 }
 
@@ -338,6 +338,19 @@ data "aws_iam_policy_document" "gateway_assume_role" {
       identifiers = ["bedrock-agentcore.amazonaws.com"]
     }
   }
+}
+
+data "aws_iam_policy_document" "gateway_assume_role_merged" {
+  for_each = {
+    for name, config in var.gateways :
+    name => config
+    if config.role_arn == null
+  }
+
+  source_policy_documents = compact([
+    data.aws_iam_policy_document.gateway_assume_role.json,
+    each.value.additional_assume_role_policy_json,
+  ])
 }
 
 resource "aws_iam_role_policy" "gateway_role_policy" {
