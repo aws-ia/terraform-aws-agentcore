@@ -357,7 +357,7 @@ resource "aws_iam_role_policy" "gateway_role_policy" {
   for_each = aws_iam_role.gateway
 
   role   = each.value.name
-  policy = data.aws_iam_policy_document.gateway_policy[each.key].json
+  policy = data.aws_iam_policy_document.gateway_policy_merged[each.key].json
 }
 
 # Wait for IAM policy propagation
@@ -410,6 +410,14 @@ data "aws_iam_policy_document" "gateway_policy" {
       ]
     }
   }
+}
+
+data "aws_iam_policy_document" "gateway_policy_merged" {
+  for_each = data.aws_iam_policy_document.gateway_policy
+  source_policy_documents = compact([
+    data.aws_iam_policy_document.gateway_policy[each.key].json,
+    var.gateways[each.key].additional_policy_json,
+  ])
 }
 
 # =============================================================================

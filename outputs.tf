@@ -159,6 +159,14 @@ output "gateway_target_gateway_ids" {
   value       = { for k, v in aws_bedrockagentcore_gateway_target.gateway_target : k => v.gateway_identifier }
 }
 
+output "gateway_workload_identity_details" {
+  description = "Map of gateway names to their workload identity details (if applicable)"
+  value = {
+    for k, v in awscc_bedrockagentcore_gateway.gateway :
+    k => v.workload_identity_details
+  }
+}
+
 # =============================================================================
 # MEMORY OUTPUTS
 # =============================================================================

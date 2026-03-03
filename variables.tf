@@ -248,6 +248,7 @@ variable "gateways" {
     description                        = optional(string)
     role_arn                           = optional(string)
     additional_assume_role_policy_json = optional(string) # Additional IAM policies to attach to the assume role policy (in JSON format)
+    additional_policy_json             = optional(string) # Additional IAM policies to attach to the gateway execution role (in JSON format)
     authorizer_type                    = optional(string, "AWS_IAM")
     protocol_type                      = optional(string, "MCP")
     exception_level                    = optional(string, "DEBUG")
