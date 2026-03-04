@@ -36,7 +36,7 @@ resource "aws_iam_role" "runtime" {
     if config.execution_role_arn == null
   }
 
-  name               = "${var.project_prefix}-${each.key}-runtime"
+  name               = trimprefix("${local.project_prefix_cleaned}-${replace(each.key, "_", "-")}-runtime", "-")
   assume_role_policy = data.aws_iam_policy_document.runtime_assume_role.json
   tags               = local.merged_tags
 }
@@ -172,7 +172,7 @@ resource "aws_iam_role" "codebuild_container" {
     if config.source_type == "CONTAINER" && config.container_source_path != null
   }
 
-  name = "${var.project_prefix}-${each.key}-codebuild-container"
+  name = trimprefix("${local.project_prefix_cleaned}-${each.key}-codebuild-container", "-")
 
   assume_role_policy = data.aws_iam_policy_document.codebuild_assume_role.json
   tags               = local.merged_tags
@@ -186,7 +186,7 @@ resource "aws_iam_role" "codebuild_code" {
     if config.source_type == "CODE" && config.code_source_path != null
   }
 
-  name = "${var.project_prefix}-${each.key}-codebuild-code"
+  name = trimprefix("${local.project_prefix_cleaned}-${replace(each.key, "_", "-")}-codebuild-code", "-")
 
   assume_role_policy = data.aws_iam_policy_document.codebuild_assume_role.json
   tags               = local.merged_tags
@@ -324,7 +324,7 @@ resource "aws_iam_role" "gateway" {
     if config.role_arn == null
   }
 
-  name               = "${var.project_prefix}-${each.key}-gateway"
+  name               = trimprefix("${local.project_prefix_cleaned}-${each.key}-gateway", "-")
   assume_role_policy = data.aws_iam_policy_document.gateway_assume_role_merged[each.key].json
   tags               = local.merged_tags
 }
@@ -431,7 +431,7 @@ resource "aws_iam_role" "memory" {
     if config.execution_role_arn == null && length(config.strategies) > 0
   }
 
-  name               = "${var.project_prefix}-${each.key}-memory"
+  name               = trimprefix("${local.project_prefix_cleaned}-${replace(each.key, "_", "-")}-memory", "-")
   assume_role_policy = data.aws_iam_policy_document.memory_assume_role.json
   tags               = local.merged_tags
 }
@@ -467,7 +467,7 @@ resource "aws_iam_role" "browser" {
     if config.execution_role_arn == null
   }
 
-  name               = "${var.project_prefix}-${each.key}-browser"
+  name               = trimprefix("${local.project_prefix_cleaned}-${replace(each.key, "_", "-")}-browser", "-")
   assume_role_policy = data.aws_iam_policy_document.browser_assume_role.json
   tags               = local.merged_tags
 }
@@ -542,7 +542,7 @@ resource "aws_iam_role" "code_interpreter" {
     if config.execution_role_arn == null
   }
 
-  name               = "${var.project_prefix}-${each.key}-code-interpreter"
+  name               = trimprefix("${local.project_prefix_cleaned}-${replace(each.key, "_", "-")}-code-interpreter", "-")
   assume_role_policy = data.aws_iam_policy_document.code_interpreter_assume_role.json
   tags               = local.merged_tags
 }

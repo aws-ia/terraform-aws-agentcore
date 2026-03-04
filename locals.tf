@@ -8,4 +8,5 @@ locals {
     var.tags,
     { ModuleVersion = local.module_version }
   )
+  project_prefix_cleaned = var.project_prefix != null ? var.project_prefix : ""
 }

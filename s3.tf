@@ -22,7 +22,7 @@ resource "aws_s3_bucket" "runtime" {
     (config.source_type == "CONTAINER" && config.container_source_path != null)
   }
 
-  bucket        = "${var.project_prefix}-${replace(each.key, "_", "-")}-${each.value.source_type == "CODE" ? "code" : "builds"}-${random_string.bucket_suffix[each.key].result}"
+  bucket        = trimprefix("${local.project_prefix_cleaned}-${replace(each.key, "_", "-")}-${each.value.source_type == "CODE" ? "code" : "builds"}-${random_string.bucket_suffix[each.key].result}", "-")
   force_destroy = true
   tags          = local.merged_tags
 }

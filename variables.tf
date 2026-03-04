@@ -3,10 +3,15 @@ variable "project_prefix" {
   description = "Prefix for all AWS resource names created by this module. Helps identify and organize resources."
   type        = string
   default     = "agentcore"
+  nullable    = true
 
   validation {
-    condition     = can(regex("^[a-z0-9-]{1,20}$", var.project_prefix))
-    error_message = "project_prefix must be lowercase alphanumeric with hyphens, max 20 characters."
+    condition = anytrue([
+      can(regex("^[a-z0-9-]{1,20}$", var.project_prefix)),
+      var.project_prefix == null,
+      var.project_prefix == "",
+    ])
+    error_message = "project_prefix must be lowercase alphanumeric with hyphens, max 20 characters, or null or an empty string."
   }
 }
 

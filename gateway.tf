@@ -53,7 +53,7 @@ resource "awscc_bedrockagentcore_gateway" "gateway" {
 resource "aws_bedrockagentcore_gateway_target" "gateway_target" {
   for_each = var.gateway_targets
 
-  name               = "${var.project_prefix}-${each.key}"
+  name               = trimprefix("${local.project_prefix_cleaned}-${replace(each.key, "_", "-")}", "-")
   gateway_identifier = awscc_bedrockagentcore_gateway.gateway[each.value.gateway_name].gateway_identifier
   description        = each.value.description
 
