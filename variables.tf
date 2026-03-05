@@ -250,14 +250,13 @@ variable "memories" {
 variable "gateways" {
   description = "Map of AgentCore gateways to create. Each key is the gateway name."
   type = map(object({
-    description                        = optional(string)
-    role_arn                           = optional(string)
-    additional_assume_role_policy_json = optional(string) # Additional IAM policies to attach to the assume role policy (in JSON format)
-    additional_policy_json             = optional(string) # Additional IAM policies to attach to the gateway execution role (in JSON format)
-    authorizer_type                    = optional(string, "AWS_IAM")
-    protocol_type                      = optional(string, "MCP")
-    exception_level                    = optional(string, "DEBUG")
-    kms_key_arn                        = optional(string)
+    description            = optional(string)
+    role_arn               = optional(string)
+    additional_policy_json = optional(string) # Additional IAM policies to attach to the gateway execution role (in JSON format)
+    authorizer_type        = optional(string, "AWS_IAM")
+    protocol_type          = optional(string, "MCP")
+    exception_level        = optional(string, "DEBUG")
+    kms_key_arn            = optional(string)
 
     authorizer_configuration = optional(object({
       custom_jwt_authorizer = object({
