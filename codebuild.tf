@@ -9,7 +9,7 @@ resource "aws_codebuild_project" "runtime_container" {
     if config.source_type == "CONTAINER" && config.container_source_path != null
   }
 
-  name          = "${var.project_prefix}-${each.key}-container"
+  name          = trimprefix("${local.project_prefix_cleaned}-${each.key}-container", "-")
   service_role  = aws_iam_role.codebuild_container[each.key].arn
   build_timeout = 60
 
@@ -19,9 +19,9 @@ resource "aws_codebuild_project" "runtime_container" {
 
   environment {
     compute_type                = "BUILD_GENERAL1_SMALL"
-    image                      = "aws/codebuild/amazonlinux2-aarch64-standard:3.0"
-    type                       = "ARM_CONTAINER"
-    privileged_mode            = true
+    image                       = "aws/codebuild/amazonlinux2-aarch64-standard:3.0"
+    type                        = "ARM_CONTAINER"
+    privileged_mode             = true
     image_pull_credentials_type = "CODEBUILD"
 
     environment_variable {
@@ -97,7 +97,7 @@ resource "aws_codebuild_project" "runtime_code" {
     if config.source_type == "CODE" && config.code_source_path != null
   }
 
-  name          = "${var.project_prefix}-${each.key}-code"
+  name          = trimprefix("${local.project_prefix_cleaned}-${each.key}-code", "-")
   service_role  = aws_iam_role.codebuild_code[each.key].arn
   build_timeout = 15
 
@@ -107,8 +107,8 @@ resource "aws_codebuild_project" "runtime_code" {
 
   environment {
     compute_type                = "BUILD_GENERAL1_SMALL"
-    image                      = "aws/codebuild/amazonlinux2-aarch64-standard:3.0"
-    type                       = "ARM_CONTAINER"
+    image                       = "aws/codebuild/amazonlinux2-aarch64-standard:3.0"
+    type                        = "ARM_CONTAINER"
     image_pull_credentials_type = "CODEBUILD"
 
     environment_variable {
