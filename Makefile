@@ -4,6 +4,7 @@ static-test:
 	@echo "Running static tests..."
 	terraform init
 	terraform validate
+	terraform fmt -recursive
 	tflint --init --config .config/.tflint.hcl
 	tflint --force --config .config/.tflint.hcl
 	@echo "Skipping tfsec (doesn't support Terraform 1.14 Actions yet)"
