@@ -53,9 +53,9 @@ variable "runtimes" {
     container_image_uri = optional(string)
 
     # Shared configuration
-    execution_role_arn       = optional(string) # Required for user-managed
-    description              = optional(string)
-    execution_network_mode   = optional(string, "PUBLIC")
+    execution_role_arn     = optional(string) # Required for user-managed
+    description            = optional(string)
+    execution_network_mode = optional(string, "PUBLIC")
     execution_network_config = optional(object({
       security_groups = list(string)
       subnets         = list(string)
@@ -156,7 +156,7 @@ variable "memories" {
     event_expiry_duration = optional(number, 90)
     execution_role_arn    = optional(string)
     encryption_key_arn    = optional(string)
-    
+
     strategies = optional(list(object({
       semantic_memory_strategy = optional(object({
         name        = optional(string)
@@ -225,7 +225,7 @@ variable "memories" {
         }))
       }))
     })), [])
-    
+
     tags = optional(map(string))
   }))
   default = {}
@@ -244,13 +244,13 @@ variable "memories" {
 variable "gateways" {
   description = "Map of AgentCore gateways to create. Each key is the gateway name."
   type = map(object({
-    description      = optional(string)
-    role_arn         = optional(string)
-    authorizer_type  = optional(string, "AWS_IAM")
-    protocol_type    = optional(string, "MCP")
-    exception_level  = optional(string, "DEBUG")
-    kms_key_arn      = optional(string)
-    
+    description     = optional(string)
+    role_arn        = optional(string)
+    authorizer_type = optional(string, "AWS_IAM")
+    protocol_type   = optional(string, "MCP")
+    exception_level = optional(string, "DEBUG")
+    kms_key_arn     = optional(string)
+
     authorizer_configuration = optional(object({
       custom_jwt_authorizer = object({
         allowed_audience = list(string)
@@ -258,7 +258,7 @@ variable "gateways" {
         discovery_url    = string
       })
     }))
-    
+
     protocol_configuration = optional(object({
       mcp = object({
         instructions       = optional(string)
@@ -266,7 +266,7 @@ variable "gateways" {
         supported_versions = optional(list(string), ["1.0.0"])
       })
     }))
-    
+
     interceptor_configurations = optional(list(object({
       interception_points = list(string)
       interceptor = object({
@@ -278,7 +278,7 @@ variable "gateways" {
         pass_request_headers = optional(bool, false)
       }))
     })), [])
-    
+
     tags = optional(map(string))
   }))
   default = {}
@@ -295,40 +295,40 @@ variable "gateways" {
 variable "gateway_targets" {
   description = "Map of AgentCore gateway targets to create. Each key is the target name."
   type = map(object({
-    gateway_name                = string
-    description                 = optional(string)
-    credential_provider_type    = optional(string)
-    
+    gateway_name             = string
+    description              = optional(string)
+    credential_provider_type = optional(string)
+
     api_key_config = optional(object({
       provider_arn              = string
       credential_location       = string
       credential_parameter_name = string
       credential_prefix         = optional(string)
     }))
-    
+
     oauth_config = optional(object({
       provider_arn      = string
       scopes            = optional(list(string))
       custom_parameters = optional(map(string))
     }))
-    
-    type = string # "LAMBDA" or "MCP_SERVER"
-    
+
+    type = string # "LAMBDA", "MCP_SERVER", "OPEN_API_SCHEMA", or "SMITHY_MODEL"
+
     lambda_config = optional(object({
       lambda_arn       = string
       tool_schema_type = string # "INLINE" or "S3"
-      
+
       inline_schema = optional(object({
         name        = string
         description = optional(string)
-        
+
         input_schema = object({
           type        = string
           description = optional(string)
           properties  = optional(list(any))
           items       = optional(any)
         })
-        
+
         output_schema = optional(object({
           type        = string
           description = optional(string)
@@ -336,15 +336,35 @@ variable "gateway_targets" {
           items       = optional(any)
         }))
       }))
-      
+
       s3_schema = optional(object({
         uri                     = string
         bucket_owner_account_id = optional(string)
       }))
     }))
-    
+
     mcp_server_config = optional(object({
       endpoint = string
+    }))
+
+    open_api_schema_config = optional(object({
+      inline_payload = optional(object({
+        payload = string
+      }))
+      s3 = optional(object({
+        uri                     = string
+        bucket_owner_account_id = optional(string)
+      }))
+    }))
+
+    smithy_model_config = optional(object({
+      inline_payload = optional(object({
+        payload = string
+      }))
+      s3 = optional(object({
+        uri                     = string
+        bucket_owner_account_id = optional(string)
+      }))
     }))
   }))
   default = {}
@@ -363,22 +383,22 @@ variable "gateway_targets" {
 variable "browsers" {
   description = "Map of AgentCore custom browsers to create. Each key is the browser name."
   type = map(object({
-    description          = optional(string)
-    execution_role_arn   = optional(string)
-    network_mode         = optional(string, "PUBLIC")
-    
+    description        = optional(string)
+    execution_role_arn = optional(string)
+    network_mode       = optional(string, "PUBLIC")
+
     network_configuration = optional(object({
       security_groups = list(string)
       subnets         = list(string)
     }))
-    
+
     recording_enabled = optional(bool, false)
-    
+
     recording_config = optional(object({
       bucket = string
       prefix = string
     }))
-    
+
     tags = optional(map(string))
   }))
   default = {}
@@ -389,15 +409,15 @@ variable "browsers" {
 variable "code_interpreters" {
   description = "Map of AgentCore custom code interpreters to create. Each key is the interpreter name."
   type = map(object({
-    description          = optional(string)
-    execution_role_arn   = optional(string)
-    network_mode         = optional(string, "SANDBOX")
-    
+    description        = optional(string)
+    execution_role_arn = optional(string)
+    network_mode       = optional(string, "SANDBOX")
+
     network_configuration = optional(object({
       security_groups = list(string)
       subnets         = list(string)
     }))
-    
+
     tags = optional(map(string))
   }))
   default = {}
