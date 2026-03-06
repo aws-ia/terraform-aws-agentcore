@@ -136,14 +136,6 @@ variable "runtimes" {
     error_message = "execution_role_arn is required when using user-managed CODE (code_s3_bucket provided)."
   }
 
-  # validation {
-  #   condition = alltrue([
-  #     for name, config in var.runtimes :
-  #     !(config.source_type == "CONTAINER" && config.container_image_uri != null && config.execution_role_arn == null)
-  #   ])
-  #   error_message = "execution_role_arn is required when using user-managed CONTAINER (container_image_uri provided)."
-  # }
-
   validation {
     condition = alltrue([
       for name, config in var.runtimes :
