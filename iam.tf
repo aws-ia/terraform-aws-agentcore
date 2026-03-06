@@ -93,7 +93,10 @@ data "aws_iam_policy_document" "runtime_policy" {
     condition {
       test     = "StringEquals"
       variable = "cloudwatch:namespace"
-      values   = ["AWS/Bedrock/AgentCore"]
+      values = [
+        "AWS/Bedrock/AgentCore",
+        "AWS/Bedrock-AgentCore",
+      ]
     }
   }
 
