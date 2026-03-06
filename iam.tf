@@ -72,7 +72,7 @@ data "aws_iam_policy_document" "runtime_policy" {
       "logs:CreateLogStream",
       "logs:PutLogEvents"
     ]
-    resources = ["arn:aws:logs:*:*:log-group:/aws/bedrock/agentcore/*"]
+    resources = ["arn:aws:logs:*:*:log-group:/aws/bedrock-agentcore/*"]
   }
 
   statement {
@@ -93,7 +93,9 @@ data "aws_iam_policy_document" "runtime_policy" {
     condition {
       test     = "StringEquals"
       variable = "cloudwatch:namespace"
-      values   = ["AWS/Bedrock/AgentCore"]
+      values = [
+        "AWS/Bedrock-AgentCore",
+      ]
     }
   }
 
@@ -477,7 +479,7 @@ data "aws_iam_policy_document" "browser_policy" {
       "logs:CreateLogStream",
       "logs:PutLogEvents"
     ]
-    resources = ["arn:aws:logs:*:*:log-group:/aws/bedrock/agentcore/*"]
+    resources = ["arn:aws:logs:*:*:log-group:/aws/bedrock-agentcore/*"]
   }
 
   dynamic "statement" {
@@ -552,6 +554,6 @@ data "aws_iam_policy_document" "code_interpreter_policy" {
       "logs:CreateLogStream",
       "logs:PutLogEvents"
     ]
-    resources = ["arn:aws:logs:*:*:log-group:/aws/bedrock/agentcore/*"]
+    resources = ["arn:aws:logs:*:*:log-group:/aws/bedrock-agentcore/*"]
   }
 }
