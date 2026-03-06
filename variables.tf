@@ -312,7 +312,7 @@ variable "gateway_targets" {
       custom_parameters = optional(map(string))
     }))
 
-    type = string # "LAMBDA" or "MCP_SERVER"
+    type = string # "LAMBDA", "MCP_SERVER", "OPEN_API_SCHEMA", or "SMITHY_MODEL"
 
     lambda_config = optional(object({
       lambda_arn       = string
