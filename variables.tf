@@ -133,14 +133,6 @@ variable "runtimes" {
   validation {
     condition = alltrue([
       for name, config in var.runtimes :
-      !(config.source_type == "CONTAINER" && config.container_image_uri != null && config.execution_role_arn == null)
-    ])
-    error_message = "execution_role_arn is required when using user-managed CONTAINER (container_image_uri provided)."
-  }
-
-  validation {
-    condition = alltrue([
-      for name, config in var.runtimes :
       config.execution_network_mode != "VPC" || config.execution_network_config != null
     ])
     error_message = "execution_network_config is required when execution_network_mode is VPC."
