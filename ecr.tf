@@ -6,7 +6,7 @@ resource "aws_ecr_repository" "runtime" {
     if config.source_type == "CONTAINER" && config.container_source_path != null
   }
 
-  name                 = "${var.project_prefix}/${each.key}"
+  name                 = trimprefix("${local.project_prefix_cleaned}/${each.key}", "/")
   image_tag_mutability = "MUTABLE"
   force_delete         = true
 

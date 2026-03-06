@@ -7,13 +7,13 @@
 resource "awscc_bedrockagentcore_gateway" "gateway" {
   for_each = var.gateways
 
-  name             = each.key
-  description      = each.value.description
-  role_arn         = each.value.role_arn != null ? each.value.role_arn : aws_iam_role.gateway[each.key].arn
-  authorizer_type  = each.value.authorizer_type
-  protocol_type    = each.value.protocol_type
-  exception_level  = each.value.exception_level
-  kms_key_arn      = each.value.kms_key_arn
+  name            = each.key
+  description     = each.value.description
+  role_arn        = each.value.role_arn != null ? each.value.role_arn : aws_iam_role.gateway[each.key].arn
+  authorizer_type = each.value.authorizer_type
+  protocol_type   = each.value.protocol_type
+  exception_level = each.value.exception_level
+  kms_key_arn     = each.value.kms_key_arn
 
   authorizer_configuration = each.value.authorizer_type == "CUSTOM_JWT" && each.value.authorizer_configuration != null ? {
     custom_jwt_authorizer = {
@@ -53,7 +53,7 @@ resource "awscc_bedrockagentcore_gateway" "gateway" {
 resource "aws_bedrockagentcore_gateway_target" "gateway_target" {
   for_each = var.gateway_targets
 
-  name               = "${var.project_prefix}-${each.key}"
+  name               = trimprefix("${local.project_prefix_cleaned}-${replace(each.key, "_", "-")}", "-")
   gateway_identifier = awscc_bedrockagentcore_gateway.gateway[each.value.gateway_name].gateway_identifier
   description        = each.value.description
 
