@@ -36,9 +36,9 @@ resource "aws_iam_role" "runtime" {
     if config.execution_role_arn == null
   }
 
-  name                 = "${var.project_prefix}-${each.key}-runtime"
-  assume_role_policy   = data.aws_iam_policy_document.runtime_assume_role.json
-  tags                 = local.merged_tags
+  name               = trimprefix("${local.project_prefix_cleaned}-${replace(each.key, "_", "-")}-runtime", "-")
+  assume_role_policy = data.aws_iam_policy_document.runtime_assume_role.json
+  tags               = local.merged_tags
 }
 
 # Wait for IAM role propagation
@@ -86,9 +86,9 @@ data "aws_iam_policy_document" "runtime_policy" {
   }
 
   statement {
-    sid    = "AllowCloudWatchMetrics"
-    effect = "Allow"
-    actions = ["cloudwatch:PutMetricData"]
+    sid       = "AllowCloudWatchMetrics"
+    effect    = "Allow"
+    actions   = ["cloudwatch:PutMetricData"]
     resources = ["*"]
     condition {
       test     = "StringEquals"
@@ -156,7 +156,7 @@ resource "aws_iam_role" "codebuild_container" {
     if config.source_type == "CONTAINER" && config.container_source_path != null
   }
 
-  name = "${var.project_prefix}-${each.key}-codebuild-container"
+  name = trimprefix("${local.project_prefix_cleaned}-${each.key}-codebuild-container", "-")
 
   assume_role_policy = data.aws_iam_policy_document.codebuild_assume_role.json
   tags               = local.merged_tags
@@ -170,7 +170,7 @@ resource "aws_iam_role" "codebuild_code" {
     if config.source_type == "CODE" && config.code_source_path != null
   }
 
-  name = "${var.project_prefix}-${each.key}-codebuild-code"
+  name = trimprefix("${local.project_prefix_cleaned}-${replace(each.key, "_", "-")}-codebuild-code", "-")
 
   assume_role_policy = data.aws_iam_policy_document.codebuild_assume_role.json
   tags               = local.merged_tags
@@ -308,7 +308,7 @@ resource "aws_iam_role" "gateway" {
     if config.role_arn == null
   }
 
-  name               = "${var.project_prefix}-${each.key}-gateway"
+  name               = trimprefix("${local.project_prefix_cleaned}-${each.key}-gateway", "-")
   assume_role_policy = data.aws_iam_policy_document.gateway_assume_role.json
   tags               = local.merged_tags
 }
@@ -371,9 +371,9 @@ data "aws_iam_policy_document" "gateway_policy" {
   dynamic "statement" {
     for_each = length([for k, v in var.gateway_targets : v if v.gateway_name == each.key && v.type == "LAMBDA"]) > 0 ? [1] : []
     content {
-      sid       = "AllowLambdaInvocation"
-      effect    = "Allow"
-      actions   = ["lambda:InvokeFunction"]
+      sid     = "AllowLambdaInvocation"
+      effect  = "Allow"
+      actions = ["lambda:InvokeFunction"]
       resources = [
         for k, v in var.gateway_targets :
         v.lambda_config.lambda_arn
@@ -394,7 +394,7 @@ resource "aws_iam_role" "memory" {
     if config.execution_role_arn == null && length(config.strategies) > 0
   }
 
-  name               = "${var.project_prefix}-${each.key}-memory"
+  name               = trimprefix("${local.project_prefix_cleaned}-${replace(each.key, "_", "-")}-memory", "-")
   assume_role_policy = data.aws_iam_policy_document.memory_assume_role.json
   tags               = local.merged_tags
 }
@@ -430,7 +430,7 @@ resource "aws_iam_role" "browser" {
     if config.execution_role_arn == null
   }
 
-  name               = "${var.project_prefix}-${each.key}-browser"
+  name               = trimprefix("${local.project_prefix_cleaned}-${replace(each.key, "_", "-")}-browser", "-")
   assume_role_policy = data.aws_iam_policy_document.browser_assume_role.json
   tags               = local.merged_tags
 }
@@ -505,7 +505,7 @@ resource "aws_iam_role" "code_interpreter" {
     if config.execution_role_arn == null
   }
 
-  name               = "${var.project_prefix}-${each.key}-code-interpreter"
+  name               = trimprefix("${local.project_prefix_cleaned}-${replace(each.key, "_", "-")}-code-interpreter", "-")
   assume_role_policy = data.aws_iam_policy_document.code_interpreter_assume_role.json
   tags               = local.merged_tags
 }
