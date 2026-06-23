@@ -92,6 +92,14 @@ resource "awscc_bedrockagentcore_runtime_endpoint" "runtime" {
     awscc_bedrockagentcore_runtime.runtime_code[each.key].agent_runtime_id,
     awscc_bedrockagentcore_runtime.runtime_container[each.key].agent_runtime_id
   )
+  # Pin the endpoint to the current runtime version so it follows version
+  # bumps. Without this, the endpoint sticks at whichever version existed at
+  # endpoint-create time and never picks up new container images or env-var
+  # updates published by subsequent applies.
+  agent_runtime_version = try(
+    awscc_bedrockagentcore_runtime.runtime_code[each.key].agent_runtime_version,
+    awscc_bedrockagentcore_runtime.runtime_container[each.key].agent_runtime_version
+  )
   tags = merge(local.merged_tags, each.value.tags)
 }
 
