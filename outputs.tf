@@ -136,6 +136,11 @@ output "gateway_role_arns" {
   value       = { for k, v in aws_iam_role.gateway : k => v.arn }
 }
 
+output "gateway_web_acl_arns" {
+  description = "Map of gateway names to the ARN of the AWS WAF web ACL associated with them (empty string when none)"
+  value       = { for k, v in awscc_bedrockagentcore_gateway.gateway : k => v.web_acl_arn }
+}
+
 output "gateway_target_ids" {
   description = "Map of gateway target names to their IDs"
   value       = { for k, v in aws_bedrockagentcore_gateway_target.gateway_target : k => v.target_id }

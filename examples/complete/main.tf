@@ -126,10 +126,16 @@ module "terraform-aws-agentcore" {
       authorizer_type = "AWS_IAM"
       protocol_configuration = {
         mcp = {
-          instructions       = "Gateway for external service integration"
-          search_type        = "SEMANTIC"
-          supported_versions = ["2025-11-25"]
+          instructions               = "Gateway for external service integration"
+          search_type                = "SEMANTIC"
+          supported_versions         = ["2025-11-25"]
+          session_timeout_in_seconds = 3600 # MCP session lifetime (900-28800)
+          enable_response_streaming  = true
         }
+      }
+      # AWS WAF failure mode (service default); set web_acl_arn to associate a regional web ACL
+      waf_configuration = {
+        failure_mode = "FAIL_CLOSE"
       }
       tags = {
         Component = "Gateway"

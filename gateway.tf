@@ -11,23 +11,23 @@ resource "awscc_bedrockagentcore_gateway" "gateway" {
   description     = each.value.description
   role_arn        = each.value.role_arn != null ? each.value.role_arn : aws_iam_role.gateway[each.key].arn
   authorizer_type = each.value.authorizer_type
-  protocol_type   = each.value.protocol_type
+  protocol_type   = each.value.protocol_type == "NONE" ? null : each.value.protocol_type # HTTP targets need a gateway without a protocol type
   exception_level = each.value.exception_level
   kms_key_arn     = each.value.kms_key_arn
 
-  authorizer_configuration = each.value.authorizer_type == "CUSTOM_JWT" && each.value.authorizer_configuration != null ? {
-    custom_jwt_authorizer = {
-      allowed_audience = each.value.authorizer_configuration.custom_jwt_authorizer.allowed_audience
-      allowed_clients  = each.value.authorizer_configuration.custom_jwt_authorizer.allowed_clients
-      discovery_url    = each.value.authorizer_configuration.custom_jwt_authorizer.discovery_url
-    }
-  } : null
+  authorizer_configuration = local.gateway_authorizer_configurations[each.key]
 
   protocol_configuration = each.value.protocol_configuration != null ? {
     mcp = {
       instructions       = each.value.protocol_configuration.mcp.instructions
       search_type        = each.value.protocol_configuration.mcp.search_type
       supported_versions = each.value.protocol_configuration.mcp.supported_versions
+      session_configuration = each.value.protocol_configuration.mcp.session_timeout_in_seconds != null ? {
+        session_timeout_in_seconds = each.value.protocol_configuration.mcp.session_timeout_in_seconds
+      } : null
+      streaming_configuration = each.value.protocol_configuration.mcp.enable_response_streaming != null ? {
+        enable_response_streaming = each.value.protocol_configuration.mcp.enable_response_streaming
+      } : null
     }
   } : null
 
@@ -41,9 +41,17 @@ resource "awscc_bedrockagentcore_gateway" "gateway" {
       }
       input_configuration = config.input_configuration != null ? {
         pass_request_headers = config.input_configuration.pass_request_headers
+        payload_filter = length(config.input_configuration.exclude_fields) > 0 ? {
+          exclude = [for field in config.input_configuration.exclude_fields : { field = field }]
+        } : null
       } : null
     }
   ] : null
+
+  # AWS WAF failure mode (the web ACL itself is associated below)
+  waf_configuration = each.value.waf_configuration != null ? {
+    failure_mode = each.value.waf_configuration.failure_mode
+  } : null
 
   # Policy engine attachment (ENFORCE or LOG_ONLY). The gateway role needs the
   # policy engine permissions (see iam.tf) before the engine can be attached.
@@ -55,6 +63,21 @@ resource "awscc_bedrockagentcore_gateway" "gateway" {
   tags = merge(local.merged_tags, each.value.tags)
 
   depends_on = [time_sleep.gateway_iam_policy_propagation]
+}
+
+# ─── AWS WAF web ACL association ───
+# One regional web ACL per gateway. The caller needs wafv2:AssociateWebACL and
+# bedrock-agentcore:GatewayAssociateWebACL (and the Disassociate counterparts).
+
+resource "aws_wafv2_web_acl_association" "gateway" {
+  for_each = {
+    for name, config in var.gateways :
+    name => config
+    if config.waf_configuration != null && config.waf_configuration.web_acl_arn != null
+  }
+
+  resource_arn = awscc_bedrockagentcore_gateway.gateway[each.key].gateway_arn
+  web_acl_arn  = each.value.waf_configuration.web_acl_arn
 }
 
 # ─── Gateway Targets ───

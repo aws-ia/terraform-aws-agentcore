@@ -346,23 +346,35 @@ variable "gateways" {
     description     = optional(string)
     role_arn        = optional(string)
     authorizer_type = optional(string, "AWS_IAM")
-    protocol_type   = optional(string, "MCP")
+    protocol_type   = optional(string, "MCP") # "MCP", or "NONE" for a gateway with HTTP targets (runtime, passthrough)
     exception_level = optional(string, "DEBUG")
     kms_key_arn     = optional(string)
 
     authorizer_configuration = optional(object({
       custom_jwt_authorizer = object({
-        allowed_audience = list(string)
-        allowed_clients  = optional(list(string))
         discovery_url    = string
+        allowed_audience = optional(list(string))
+        allowed_clients  = optional(list(string))
+        allowed_scopes   = optional(list(string))
+        custom_claims = optional(list(object({
+          inbound_token_claim_name       = string
+          inbound_token_claim_value_type = optional(string, "STRING") # "STRING" or "STRING_ARRAY"
+          claim_match_operator           = optional(string, "EQUALS") # "EQUALS" (STRING), "CONTAINS" or "CONTAINS_ANY" (STRING_ARRAY)
+          match_value_string             = optional(string)
+          match_value_string_list        = optional(list(string))
+        })), [])
+        # Scope advertised to clients (OAuth protected resource metadata) for each allowed scope
+        advertised_scope_mapping = optional(map(string))
       })
     }))
 
     protocol_configuration = optional(object({
       mcp = object({
-        instructions       = optional(string)
-        search_type        = optional(string, "SEMANTIC")
-        supported_versions = optional(list(string), ["1.0.0"])
+        instructions               = optional(string)
+        search_type                = optional(string, "SEMANTIC")
+        supported_versions         = optional(list(string), ["1.0.0"])
+        session_timeout_in_seconds = optional(number) # 900-28800 (service default 3600)
+        enable_response_streaming  = optional(bool)
       })
     }))
 
@@ -375,8 +387,15 @@ variable "gateways" {
       })
       input_configuration = optional(object({
         pass_request_headers = optional(bool, false)
+        exclude_fields       = optional(list(string), []) # e.g. ["RESPONSE_BODY"] for HTTP and inference targets
       }))
     })), [])
+
+    # AWS WAF: behaviour when WAF cannot be evaluated, and an optional regional web ACL to associate
+    waf_configuration = optional(object({
+      failure_mode = optional(string, "FAIL_CLOSE") # "FAIL_CLOSE" or "FAIL_OPEN"
+      web_acl_arn  = optional(string)
+    }))
 
     # Attach a policy engine (module-managed by name, or an existing one by ARN)
     policy_engine_configuration = optional(object({
@@ -421,6 +440,83 @@ variable "gateways" {
       config.policy_engine_configuration == null || contains(["ENFORCE", "LOG_ONLY"], config.policy_engine_configuration.mode)
     ])
     error_message = "policy_engine_configuration.mode must be either 'ENFORCE' or 'LOG_ONLY'."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateways :
+      contains(["MCP", "NONE"], config.protocol_type)
+    ])
+    error_message = "protocol_type must be 'MCP', or 'NONE' for a gateway that only has HTTP targets."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateways :
+      config.protocol_type != "NONE" || config.protocol_configuration == null
+    ])
+    error_message = "protocol_configuration can only be set when protocol_type is MCP."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateways :
+      config.authorizer_type != "CUSTOM_JWT" || config.authorizer_configuration != null
+    ])
+    error_message = "authorizer_configuration.custom_jwt_authorizer is required when authorizer_type is CUSTOM_JWT."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateways :
+      config.authorizer_configuration == null || (
+        try(length(config.authorizer_configuration.custom_jwt_authorizer.allowed_audience), 0) +
+        try(length(config.authorizer_configuration.custom_jwt_authorizer.allowed_clients), 0) +
+        try(length(config.authorizer_configuration.custom_jwt_authorizer.allowed_scopes), 0) +
+        length(config.authorizer_configuration.custom_jwt_authorizer.custom_claims)
+      ) > 0
+    ])
+    error_message = "custom_jwt_authorizer needs at least one of allowed_audience, allowed_clients, allowed_scopes or custom_claims."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for name, config in var.gateways : [
+        for claim in(config.authorizer_configuration == null ? [] : config.authorizer_configuration.custom_jwt_authorizer.custom_claims) :
+        (claim.inbound_token_claim_value_type == "STRING" && claim.claim_match_operator == "EQUALS" && claim.match_value_string != null) ||
+        (claim.inbound_token_claim_value_type == "STRING_ARRAY" && contains(["CONTAINS", "CONTAINS_ANY"], claim.claim_match_operator) && claim.match_value_string_list != null)
+      ]
+    ]))
+    error_message = "custom_claims: STRING claims use claim_match_operator EQUALS with match_value_string; STRING_ARRAY claims use CONTAINS or CONTAINS_ANY with match_value_string_list."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateways :
+      config.authorizer_configuration == null || config.authorizer_configuration.custom_jwt_authorizer.advertised_scope_mapping == null || alltrue([
+        for scope in keys(config.authorizer_configuration.custom_jwt_authorizer.advertised_scope_mapping) :
+        contains(try(config.authorizer_configuration.custom_jwt_authorizer.allowed_scopes, []), scope)
+      ])
+    ])
+    error_message = "advertised_scope_mapping keys must be scopes listed in allowed_scopes."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateways :
+      config.protocol_configuration == null || config.protocol_configuration.mcp.session_timeout_in_seconds == null || (
+        config.protocol_configuration.mcp.session_timeout_in_seconds >= 900 && config.protocol_configuration.mcp.session_timeout_in_seconds <= 28800
+      )
+    ])
+    error_message = "protocol_configuration.mcp.session_timeout_in_seconds must be between 900 and 28800."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateways :
+      config.waf_configuration == null || contains(["FAIL_CLOSE", "FAIL_OPEN"], config.waf_configuration.failure_mode)
+    ])
+    error_message = "waf_configuration.failure_mode must be either 'FAIL_CLOSE' or 'FAIL_OPEN'."
   }
 }
 
