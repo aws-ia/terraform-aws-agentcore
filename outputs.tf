@@ -176,3 +176,25 @@ output "memory_role_arns" {
 }
 
 # =============================================================================
+
+# =============================================================================
+# WORKLOAD IDENTITY OUTPUTS
+# =============================================================================
+
+output "workload_identity_arns" {
+  description = "Map of workload identity names to their ARNs"
+  value       = { for k, v in aws_bedrockagentcore_workload_identity.workload_identity : k => v.workload_identity_arn }
+}
+
+output "runtime_workload_identity_arns" {
+  description = "Map of runtime names to the ARN of the workload identity AgentCore created for the runtime"
+  value = merge(
+    { for k, v in awscc_bedrockagentcore_runtime.runtime_code : k => v.workload_identity_details.workload_identity_arn },
+    { for k, v in awscc_bedrockagentcore_runtime.runtime_container : k => v.workload_identity_details.workload_identity_arn }
+  )
+}
+
+output "gateway_workload_identity_arns" {
+  description = "Map of gateway names to the ARN of the workload identity AgentCore created for the gateway"
+  value       = { for k, v in awscc_bedrockagentcore_gateway.gateway : k => v.workload_identity_details.workload_identity_arn }
+}

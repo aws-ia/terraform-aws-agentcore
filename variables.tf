@@ -403,3 +403,21 @@ variable "code_interpreters" {
   default = {}
 }
 
+# – Agent Core Workload Identities –
+
+variable "workload_identities" {
+  description = "Map of AgentCore workload identities to create. Each key is the workload identity name. Runtimes and gateways get a workload identity automatically; declare identities here for agents that run elsewhere or that need OAuth2 return URLs for 3-legged OAuth flows."
+  type = map(object({
+    allowed_resource_oauth2_return_urls = optional(list(string), [])
+    tags                                = optional(map(string))
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for name, config in var.workload_identities :
+      can(regex("^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$", name))
+    ])
+    error_message = "Workload identity names must be alphanumeric (plus ., _, -) and at most 255 characters."
+  }
+}

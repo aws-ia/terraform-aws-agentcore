@@ -117,6 +117,22 @@ data "aws_iam_policy_document" "runtime_policy" {
     resources = ["*"]
   }
 
+  # Workload access tokens for the runtime's own workload identity
+  # (AgentCore Identity creates it as <runtime name>-<id> in the default directory)
+  statement {
+    sid    = "AllowWorkloadAccessToken"
+    effect = "Allow"
+    actions = [
+      "bedrock-agentcore:GetWorkloadAccessToken",
+      "bedrock-agentcore:GetWorkloadAccessTokenForJWT",
+      "bedrock-agentcore:GetWorkloadAccessTokenForUserId"
+    ]
+    resources = [
+      "arn:aws:bedrock-agentcore:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
+      "arn:aws:bedrock-agentcore:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${each.key}-*"
+    ]
+  }
+
   # CODE: S3 read permissions
   dynamic "statement" {
     for_each = each.value.source_type == "CODE" ? [1] : []

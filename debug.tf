@@ -67,6 +67,12 @@ locals {
     for name, config in var.runtimes : name => aws_ecr_repository.runtime[name].repository_url
     if config.source_type == "CONTAINER" && config.container_source_path != null
   }
+
+  debug_workload_identities = {
+    for name, config in var.workload_identities : name => {
+      arn = aws_bedrockagentcore_workload_identity.workload_identity[name].workload_identity_arn
+    }
+  }
 }
 
 resource "local_file" "debug_env" {
@@ -88,6 +94,7 @@ resource "local_file" "debug_env" {
     length(local.debug_browsers) > 0 ? ["BROWSERS='${jsonencode(local.debug_browsers)}'"] : [],
     length(local.debug_code_interpreters) > 0 ? ["CODE_INTERPRETERS='${jsonencode(local.debug_code_interpreters)}'"] : [],
     length(local.debug_gateway_targets) > 0 ? ["GATEWAY_TARGETS='${jsonencode(local.debug_gateway_targets)}'"] : [],
+    length(local.debug_workload_identities) > 0 ? ["WORKLOAD_IDENTITIES='${jsonencode(local.debug_workload_identities)}'"] : [],
     [""],
     ["# S3/ECR Resources"],
     length(aws_s3_bucket.runtime) > 0 ? ["S3_BUCKETS='${jsonencode({for k, v in aws_s3_bucket.runtime : k => v.id})}'"] : [],
