@@ -29,6 +29,7 @@ Ordered from simplest to most complex:
 - `05_gateway_policy.tftest.hcl` - Gateway with a policy engine (ENFORCE), 2 Lambda targets, 2 Cedar policies and 1 Dogwood temporal policy (~3-5min)
 - `06_configuration_bundles.tftest.hcl` - CODE runtime plus 2 configuration bundles keyed by the runtime ARN (~3-5min)
 - `07_workload_identity.tftest.hcl` - CODE runtime (identity exposed as output) plus 1 managed workload identity (~3-5min)
+- `08_gateway_targets.tftest.hcl` - Cognito-backed JWT runtime, MCP gateway with a static-schema MCP server target, protocol-less gateway with runtime and passthrough targets (~5-8min)
 
 ## Mocked Unit Tests
 

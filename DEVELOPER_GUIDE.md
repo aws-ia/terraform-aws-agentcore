@@ -1082,3 +1082,23 @@ There is no runtime attribute for a bundle. The bundle reference travels with ea
 ### Agent Registry namespaces
 
 AWS Agent Registry launched under the `agent-registry` namespace on August 6, 2026. The module uses `awscc_agentregistry_registry` and `awscc_agentregistry_registry_record` and grants `agent-registry:*` actions; the deprecated `aws_bedrockagentcore_registry` resource and the `bedrock-agentcore:*Registry*` actions stop working on October 30, 2026. Records are normally written at run time by a publishing pipeline with the publisher IAM policy the module creates.
+
+## Gateway Target Families and Inbound JWT
+
+### Two gateway families
+
+The service distinguishes gateways by protocol type. An MCP gateway (`protocol_type = "MCP"`, the default) aggregates `LAMBDA` and `MCP_SERVER` targets into one virtual MCP server. A gateway created **without** a protocol type is the front door for HTTP targets: `AGENTCORE_RUNTIME` (requests forwarded to a runtime, no aggregation) and `HTTP_PASSTHROUGH` (any HTTPS endpoint, protocol MCP, A2A, INFERENCE or CUSTOM). Because an `optional(string, "MCP")` attribute cannot be set to null by the caller (null falls back to the default), the module accepts `protocol_type = "NONE"` and sends null to the provider. Variable validation enforces that each target family lands on the right gateway family and that `protocol_configuration` is only set on MCP gateways.
+
+`gateway.tf` renders `target_configuration` with `dynamic "mcp"` and `dynamic "http"` blocks. A `dynamic` block with a single-element `for_each` produces the same configuration as the previous static `mcp {}` block, so existing LAMBDA and MCP_SERVER targets plan no changes.
+
+### Runtime targets and IAM
+
+A runtime target is signed with the gateway role for the `bedrock-agentcore` service (`gateway_iam_role { service = "bedrock-agentcore" }`, set automatically when `credential_provider_type = "GATEWAY_IAM_ROLE"`), so the gateway role needs `bedrock-agentcore:InvokeAgentRuntime` on the runtime. For module-managed runtimes (`runtime_name`) the statement uses `runtime/<name>-*`, which matches the runtime and its endpoints without making the gateway role policy depend on the runtime resource; otherwise the gateway (which waits for its role policy) would wait for the runtime build. The runtime ARN itself comes from `local.runtime_arns`, kept separate from `local.placeholder_values` because that table also contains the gateway targets, which would be a dependency cycle.
+
+### Inbound JWT authorization
+
+Runtimes and gateways share the `custom_jwt_authorizer` shape (discovery URL plus at least one of allowed audience, clients, scopes or custom claims). `locals.tf` maps it to the awscc shape once per resource type (`runtime_authorizer_configurations`, `gateway_authorizer_configurations`); the gateway variant adds `advertised_scope_mapping`, the runtime variant adds `allowed_workload_configuration` (restrict callers to a gateway's workload identity). Custom claims are validated by shape: `STRING` claims use `EQUALS` with `match_value_string`, `STRING_ARRAY` claims use `CONTAINS` or `CONTAINS_ANY` with `match_value_string_list`.
+
+### AWS WAF
+
+The gateway resource only carries the failure mode (`FAIL_CLOSE` or `FAIL_OPEN`). The web ACL itself is associated with `aws_wafv2_web_acl_association` against the gateway ARN when `waf_configuration.web_acl_arn` is set; the web ACL must be regional and in the gateway's Region, and the caller needs `wafv2:AssociateWebACL` and `bedrock-agentcore:GatewayAssociateWebACL`.

@@ -45,6 +45,9 @@ Terraform module for creating and managing Amazon Bedrock AgentCore resources. A
 - Dynamic Configuration Bundle Creation (per-request agent configuration)
 - Dynamic Workload Identity Creation, plus the identities AgentCore creates for Runtimes and Gateways as outputs
 - Dynamic AWS Agent Registry Creation with Publisher IAM and optional Terraform-managed Records
+- Runtime Protocol (HTTP, MCP, A2A, AG-UI), Session Lifecycle, Request Header Allowlist, Platform Version and JWT Inbound Authorization
+- Gateway JWT Scopes and Custom Claims, MCP Session Timeout and Response Streaming, Interceptor Payload Filters and AWS WAF
+- Gateway Targets for AgentCore Runtimes and HTTP Passthrough Endpoints, MCP Servers with Static Tool Schemas, and Header Propagation
 
 ## Important
 
@@ -55,6 +58,8 @@ Terraform module for creating and managing Amazon Bedrock AgentCore resources. A
 - **Policy engine, policy and configuration bundle names use underscores, not hyphens** (`my_policy_engine`); gateway, gateway target and registry names use hyphens.
 - Policy statements and configuration bundle component keys can reference resources created in the same module call with the `{{gateway:<name>}}`, `{{target:<name>}}` and `{{runtime:<name>}}` placeholders, which the module resolves at apply time. Gateway tools are named `<target name>___<tool>`, and gateway target names are prefixed with `project_prefix`.
 - AWS Agent Registry is used through its own `agent-registry` namespace (`awscc_agentregistry_*` resources and `agent-registry:*` IAM actions). The public-preview `bedrock-agentcore` registry namespace shuts down on October 30, 2026.
+- Gateway targets come in two families. `LAMBDA` and `MCP_SERVER` targets need a gateway with `protocol_type = "MCP"` (the default); `AGENTCORE_RUNTIME` and `HTTP_PASSTHROUGH` targets need a gateway created with `protocol_type = "NONE"`, which the module maps to a gateway without a protocol type. HTTP targets are reached by path: `<gateway url host>/<target name>/invocations` for runtimes.
+- Inbound JWT authorization is the same `custom_jwt_authorizer` shape on runtimes and gateways (discovery URL plus at least one of allowed audience, clients, scopes or custom claims). The runtime's `request_header_allowlist` may include `Authorization` only when a JWT authorizer is configured.
 
 ## Basic Usage - Create Runtime with Endpoint
 
@@ -156,6 +161,82 @@ module "agentcore" {
   }
 }
 ```
+
+## Basic Usage - Front a Runtime with a Gateway (JWT, HTTP targets)
+
+```hcl
+module "agentcore" {
+  source = "aws-ia/agentcore/aws"
+
+  runtimes = {
+    my_agent = {
+      source_type      = "CODE"
+      code_source_path = "./agent"
+      code_entry_point = ["agent.py"]
+
+      protocol_configuration = "HTTP" # or MCP, A2A, AGUI
+      lifecycle_configuration = {
+        idle_runtime_session_timeout = 900
+        max_lifetime                 = 3600
+      }
+      request_header_allowlist = ["Authorization", "X-Correlation-Id"]
+      authorizer_configuration = {
+        custom_jwt_authorizer = {
+          discovery_url   = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_example/.well-known/openid-configuration"
+          allowed_clients = ["my-client-id"]
+        }
+      }
+    }
+  }
+
+  gateways = {
+    agents-gateway = {
+      protocol_type   = "NONE" # HTTP targets need a gateway without a protocol type
+      authorizer_type = "CUSTOM_JWT"
+      authorizer_configuration = {
+        custom_jwt_authorizer = {
+          discovery_url   = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_example/.well-known/openid-configuration"
+          allowed_clients = ["my-client-id"]
+          custom_claims = [{
+            inbound_token_claim_name = "token_use"
+            match_value_string       = "access"
+          }]
+        }
+      }
+      waf_configuration = {
+        failure_mode = "FAIL_CLOSE"
+        web_acl_arn  = "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/my-web-acl/a1b2c3d4"
+      }
+    }
+  }
+
+  gateway_targets = {
+    my-agent = {
+      gateway_name             = "agents-gateway"
+      type                     = "AGENTCORE_RUNTIME"
+      credential_provider_type = "GATEWAY_IAM_ROLE" # signed for bedrock-agentcore; the role gets InvokeAgentRuntime
+      agentcore_runtime_config = {
+        runtime_name = "my_agent"
+      }
+      metadata_configuration = {
+        allowed_request_headers = ["x-correlation-id"]
+      }
+    }
+
+    partner-agent = {
+      gateway_name             = "agents-gateway"
+      type                     = "HTTP_PASSTHROUGH"
+      credential_provider_type = "JWT_PASSTHROUGH"
+      passthrough_config = {
+        endpoint      = "https://partner-agent.example.com"
+        protocol_type = "A2A"
+      }
+    }
+  }
+}
+```
+
+MCP gateways gain `protocol_configuration.mcp.session_timeout_in_seconds` and `enable_response_streaming`, and `MCP_SERVER` targets accept `listing_mode`, `resource_priority` and a static `tool_schema` (inline JSON or S3) that skips tool discovery.
 
 ## Basic Usage - Attach a Policy Engine to a Gateway
 
@@ -306,6 +387,7 @@ The module includes several examples demonstrating different use cases:
 - [configuration-bundles](./examples/configuration-bundles) - CODE runtime whose prompt and model come from configuration bundles selected per request
 - [workload-identity](./examples/workload-identity) - Runtime workload identity output plus an explicitly managed workload identity
 - [agent-registry](./examples/agent-registry) - AWS Agent Registry registry, publisher IAM and a Terraform-managed MCP server record
+- [gateway-targets](./examples/gateway-targets) - JWT-protected runtime and gateways, MCP server target with a static tool schema, AgentCore Runtime and HTTP passthrough targets
 
 See the [examples](./examples) directory for complete working examples.
 
@@ -424,7 +506,7 @@ No modules.
 | <a name="input_code_interpreters"></a> [code\_interpreters](#input\_code\_interpreters) | Map of AgentCore custom code interpreters to create. Each key is the interpreter name. | <pre>map(object({<br>    description        = optional(string)<br>    execution_role_arn = optional(string)<br>    network_mode       = optional(string, "SANDBOX")<br><br>    network_configuration = optional(object({<br>      security_groups = list(string)<br>      subnets         = list(string)<br>    }))<br><br>    tags = optional(map(string))<br>  }))</pre> | `{}` | no |
 | <a name="input_configuration_bundles"></a> [configuration\_bundles](#input\_configuration\_bundles) | Map of AgentCore configuration bundles to create. Each key is the bundle name. components maps a component identifier (an AgentCore resource ARN, or a {{runtime:<name>}} / {{gateway:<name>}} placeholder for a resource created by this module) to its configuration object, which is stored as JSON. | <pre>map(object({<br>    description    = optional(string)<br>    branch_name    = optional(string) # defaults to "mainline"<br>    commit_message = optional(string)<br>    kms_key_arn    = optional(string)<br>    components     = any # map of component identifier => configuration object<br>    tags           = optional(map(string))<br>  }))</pre> | `{}` | no |
 | <a name="input_debug"></a> [debug](#input\_debug) | Enable debug mode: generates .env files with actual resource IDs in code\_source\_path directories for local testing. | `bool` | `false` | no |
-| <a name="input_gateway_targets"></a> [gateway\_targets](#input\_gateway\_targets) | Map of AgentCore gateway targets to create. Each key is the target name. | <pre>map(object({<br>    gateway_name             = string<br>    description              = optional(string)<br>    credential_provider_type = optional(string)<br><br>    api_key_config = optional(object({<br>      provider_arn              = string<br>      credential_location       = string<br>      credential_parameter_name = string<br>      credential_prefix         = optional(string)<br>    }))<br><br>    oauth_config = optional(object({<br>      provider_arn      = string<br>      scopes            = optional(list(string))<br>      custom_parameters = optional(map(string))<br>    }))<br><br>    type = string # "LAMBDA" or "MCP_SERVER"<br><br>    lambda_config = optional(object({<br>      lambda_arn       = string<br>      tool_schema_type = string # "INLINE" or "S3"<br><br>      inline_schema = optional(object({<br>        name        = string<br>        description = optional(string)<br><br>        input_schema = object({<br>          type        = string<br>          description = optional(string)<br>          properties  = optional(list(any))<br>          items       = optional(any)<br>        })<br><br>        output_schema = optional(object({<br>          type        = string<br>          description = optional(string)<br>          properties  = optional(list(any))<br>          items       = optional(any)<br>        }))<br>      }))<br><br>      s3_schema = optional(object({<br>        uri                     = string<br>        bucket_owner_account_id = optional(string)<br>      }))<br>    }))<br><br>    mcp_server_config = optional(object({<br>      endpoint = string<br>    }))<br>  }))</pre> | `{}` | no |
+| <a name="input_gateway_targets"></a> [gateway\_targets](#input\_gateway\_targets) | Map of AgentCore gateway targets to create. Each key is the target name. MCP targets (LAMBDA, MCP\_SERVER) attach to MCP gateways; HTTP targets (AGENTCORE\_RUNTIME, HTTP\_PASSTHROUGH) attach to gateways with protocol\_type NONE. | <pre>map(object({<br>    gateway_name             = string<br>    description              = optional(string)<br>    credential_provider_type = optional(string) # "GATEWAY_IAM_ROLE", "API_KEY", "OAUTH", "JWT_PASSTHROUGH" or "CALLER_IAM_CREDENTIALS"<br><br>    # GATEWAY_IAM_ROLE: SigV4 signing of upstream requests (service is set to bedrock-agentcore for AGENTCORE_RUNTIME targets)<br>    gateway_iam_role_config = optional(object({<br>      service = optional(string)<br>      region  = optional(string)<br>    }))<br><br>    api_key_config = optional(object({<br>      provider_arn              = string<br>      credential_location       = string<br>      credential_parameter_name = string<br>      credential_prefix         = optional(string)<br>    }))<br><br>    oauth_config = optional(object({<br>      provider_arn       = string<br>      scopes             = optional(list(string))<br>      custom_parameters  = optional(map(string))<br>      grant_type         = optional(string) # "CLIENT_CREDENTIALS", "AUTHORIZATION_CODE" or "TOKEN_EXCHANGE"<br>      default_return_url = optional(string)<br>    }))<br><br>    # CALLER_IAM_CREDENTIALS: sign upstream requests with the caller's own identity<br>    caller_iam_config = optional(object({<br>      service = string<br>      region  = optional(string)<br>    }))<br><br>    type = string # "LAMBDA", "MCP_SERVER", "AGENTCORE_RUNTIME" or "HTTP_PASSTHROUGH"<br><br>    lambda_config = optional(object({<br>      lambda_arn       = string<br>      tool_schema_type = string # "INLINE" or "S3"<br><br>      inline_schema = optional(object({<br>        name        = string<br>        description = optional(string)<br><br>        input_schema = object({<br>          type        = string<br>          description = optional(string)<br>          properties  = optional(list(any))<br>          items       = optional(any)<br>        })<br><br>        output_schema = optional(object({<br>          type        = string<br>          description = optional(string)<br>          properties  = optional(list(any))<br>          items       = optional(any)<br>        }))<br>      }))<br><br>      s3_schema = optional(object({<br>        uri                     = string<br>        bucket_owner_account_id = optional(string)<br>      }))<br>    }))<br><br>    mcp_server_config = optional(object({<br>      endpoint          = string<br>      listing_mode      = optional(string) # "DEFAULT" or "DYNAMIC"<br>      resource_priority = optional(number) # lower values win for shared resource URIs (service default 1000)<br><br>      # Static tool schema: disables dynamic tool discovery and synchronization<br>      tool_schema = optional(object({<br>        inline_payload             = optional(string) # JSON tool definitions<br>        s3_uri                     = optional(string)<br>        s3_bucket_owner_account_id = optional(string)<br>      }))<br>    }))<br><br>    # AGENTCORE_RUNTIME: route requests straight to a runtime (module-managed by name, or by ARN)<br>    agentcore_runtime_config = optional(object({<br>      runtime_name = optional(string)<br>      runtime_arn  = optional(string)<br>      qualifier    = optional(string) # runtime endpoint name (service default DEFAULT)<br><br>      # OpenAPI or Smithy schema; needed for guardrails on HTTP-protocol runtimes<br>      schema = optional(object({<br>        inline_payload             = optional(string)<br>        s3_uri                     = optional(string)<br>        s3_bucket_owner_account_id = optional(string)<br>      }))<br>    }))<br><br>    # HTTP_PASSTHROUGH: forward requests to an external HTTPS endpoint<br>    passthrough_config = optional(object({<br>      endpoint      = string<br>      protocol_type = string # "MCP", "A2A", "INFERENCE" or "CUSTOM"<br><br>      schema = optional(object({<br>        inline_payload             = optional(string)<br>        s3_uri                     = optional(string)<br>        s3_bucket_owner_account_id = optional(string)<br>      }))<br><br>      static_query_parameters                    = optional(map(string))<br>      static_query_parameter_conflict_resolution = optional(string) # "CLIENT_OVERRIDE" or "STATIC_OVERRIDE"<br><br>      stickiness_configuration = optional(object({<br>        identifier           = string # e.g. "$context.header.x-session-id"<br>        composite_identifier = optional(list(string))<br>        timeout              = optional(number) # seconds, 1-86400<br>      }))<br>    }))<br><br>    # Header and query parameter propagation between client, gateway and target (max 10 each)<br>    metadata_configuration = optional(object({<br>      allowed_request_headers  = optional(list(string))<br>      allowed_response_headers = optional(list(string))<br>      allowed_query_parameters = optional(list(string))<br>    }))<br>  }))</pre> | `{}` | no |
 | <a name="input_gateways"></a> [gateways](#input\_gateways) | Map of AgentCore gateways to create. Each key is the gateway name. | <pre>map(object({<br>    description     = optional(string)<br>    role_arn        = optional(string)<br>    authorizer_type = optional(string, "AWS_IAM")<br>    protocol_type   = optional(string, "MCP") # "MCP", or "NONE" for a gateway with HTTP targets (runtime, passthrough)<br>    exception_level = optional(string, "DEBUG")<br>    kms_key_arn     = optional(string)<br><br>    authorizer_configuration = optional(object({<br>      custom_jwt_authorizer = object({<br>        discovery_url    = string<br>        allowed_audience = optional(list(string))<br>        allowed_clients  = optional(list(string))<br>        allowed_scopes   = optional(list(string))<br>        custom_claims = optional(list(object({<br>          inbound_token_claim_name       = string<br>          inbound_token_claim_value_type = optional(string, "STRING") # "STRING" or "STRING_ARRAY"<br>          claim_match_operator           = optional(string, "EQUALS") # "EQUALS" (STRING), "CONTAINS" or "CONTAINS_ANY" (STRING_ARRAY)<br>          match_value_string             = optional(string)<br>          match_value_string_list        = optional(list(string))<br>        })), [])<br>        # Scope advertised to clients (OAuth protected resource metadata) for each allowed scope<br>        advertised_scope_mapping = optional(map(string))<br>      })<br>    }))<br><br>    protocol_configuration = optional(object({<br>      mcp = object({<br>        instructions               = optional(string)<br>        search_type                = optional(string, "SEMANTIC")<br>        supported_versions         = optional(list(string), ["1.0.0"])<br>        session_timeout_in_seconds = optional(number) # 900-28800 (service default 3600)<br>        enable_response_streaming  = optional(bool)<br>      })<br>    }))<br><br>    interceptor_configurations = optional(list(object({<br>      interception_points = list(string)<br>      interceptor = object({<br>        lambda = object({<br>          arn = string<br>        })<br>      })<br>      input_configuration = optional(object({<br>        pass_request_headers = optional(bool, false)<br>        exclude_fields       = optional(list(string), []) # e.g. ["RESPONSE_BODY"] for HTTP and inference targets<br>      }))<br>    })), [])<br><br>    # AWS WAF: behaviour when WAF cannot be evaluated, and an optional regional web ACL to associate<br>    waf_configuration = optional(object({<br>      failure_mode = optional(string, "FAIL_CLOSE") # "FAIL_CLOSE" or "FAIL_OPEN"<br>      web_acl_arn  = optional(string)<br>    }))<br><br>    # Attach a policy engine (module-managed by name, or an existing one by ARN)<br>    policy_engine_configuration = optional(object({<br>      policy_engine_name = optional(string)<br>      policy_engine_arn  = optional(string)<br>      mode               = optional(string, "ENFORCE") # "ENFORCE" or "LOG_ONLY"<br>    }))<br><br>    tags = optional(map(string))<br>  }))</pre> | `{}` | no |
 | <a name="input_memories"></a> [memories](#input\_memories) | Map of AgentCore memories to create. Each key is the memory name. NOTE: Each memory can only have ONE strategy. | <pre>map(object({<br>    description           = optional(string)<br>    event_expiry_duration = optional(number, 90)<br>    execution_role_arn    = optional(string)<br>    encryption_key_arn    = optional(string)<br><br>    strategies = optional(list(object({<br>      semantic_memory_strategy = optional(object({<br>        name        = optional(string)<br>        description = optional(string)<br>        namespaces  = optional(list(string))<br>      }))<br>      summary_memory_strategy = optional(object({<br>        name        = optional(string)<br>        description = optional(string)<br>        namespaces  = optional(list(string))<br>      }))<br>      user_preference_memory_strategy = optional(object({<br>        name        = optional(string)<br>        description = optional(string)<br>        namespaces  = optional(list(string))<br>      }))<br>      custom_memory_strategy = optional(object({<br>        name        = optional(string)<br>        description = optional(string)<br>        namespaces  = optional(list(string))<br>        configuration = optional(object({<br>          self_managed_configuration = optional(object({<br>            historical_context_window_size = optional(number, 4)<br>            invocation_configuration = object({<br>              payload_delivery_bucket_name = string<br>              topic_arn                    = string<br>            })<br>            trigger_conditions = optional(list(object({<br>              message_based_trigger = optional(object({<br>                message_count = optional(number, 1)<br>              }))<br>              time_based_trigger = optional(object({<br>                idle_session_timeout = optional(number, 10)<br>              }))<br>              token_based_trigger = optional(object({<br>                token_count = optional(number, 100)<br>              }))<br>            })))<br>          }))<br>          semantic_override = optional(object({<br>            consolidation = optional(object({<br>              append_to_prompt = optional(string)<br>              model_id         = optional(string)<br>            }))<br>            extraction = optional(object({<br>              append_to_prompt = optional(string)<br>              model_id         = optional(string)<br>            }))<br>          }))<br>          summary_override = optional(object({<br>            consolidation = optional(object({<br>              append_to_prompt = optional(string)<br>              model_id         = optional(string)<br>            }))<br>          }))<br>          user_preference_override = optional(object({<br>            consolidation = optional(object({<br>              append_to_prompt = optional(string)<br>              model_id         = optional(string)<br>            }))<br>            extraction = optional(object({<br>              append_to_prompt = optional(string)<br>              model_id         = optional(string)<br>            }))<br>          }))<br>        }))<br>      }))<br>    })), [])<br><br>    tags = optional(map(string))<br>  }))</pre> | `{}` | no |
 | <a name="input_policy_engines"></a> [policy\_engines](#input\_policy\_engines) | Map of AgentCore policy engines to create. Each key is the policy engine name. Attach an engine to a gateway with the gateway's policy\_engine\_configuration. Statements may use {{gateway:<name>}}, {{target:<name>}} and {{runtime:<name>}} placeholders, which resolve to resources created by this module. | <pre>map(object({<br>    description        = optional(string)<br>    encryption_key_arn = optional(string)<br><br>    policies = optional(list(object({<br>      name             = string<br>      description      = optional(string)<br>      statement        = string                                   # Cedar or Dogwood policy text<br>      language         = optional(string, "CEDAR")                # "CEDAR" or "DOGWOOD" (temporal rules, guardrails)<br>      enforcement_mode = optional(string, "ACTIVE")               # "ACTIVE" or "LOG_ONLY"<br>      validation_mode  = optional(string, "FAIL_ON_ANY_FINDINGS") # "FAIL_ON_ANY_FINDINGS" or "IGNORE_ALL_FINDINGS"<br>    })), [])<br><br>    tags = optional(map(string))<br>  }))</pre> | `{}` | no |
