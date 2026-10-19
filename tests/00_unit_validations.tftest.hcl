@@ -459,12 +459,12 @@ run "target_rejects_more_than_10_headers" {
   expect_failures = [var.gateway_targets]
 }
 
-run "target_rejects_gateway_role_credentials_on_runtime_target" {
+run "target_rejects_sigv4_service_on_runtime_target" {
   command = plan
 
   variables {
     gateways        = { g = { protocol_type = "NONE" } }
-    gateway_targets = { t = { gateway_name = "g", type = "AGENTCORE_RUNTIME", credential_provider_type = "GATEWAY_IAM_ROLE", agentcore_runtime_config = { runtime_arn = "arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/a-0123456789" } } }
+    gateway_targets = { t = { gateway_name = "g", type = "AGENTCORE_RUNTIME", credential_provider_type = "GATEWAY_IAM_ROLE", gateway_iam_role_config = { service = "bedrock-agentcore" }, agentcore_runtime_config = { runtime_arn = "arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/a-0123456789" } } }
   }
 
   expect_failures = [var.gateway_targets]

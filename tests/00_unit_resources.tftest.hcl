@@ -440,8 +440,8 @@ run "http_targets_and_runtime_attributes" {
   }
 
   assert {
-    condition     = length(aws_bedrockagentcore_gateway_target.gateway_target["agent"].credential_provider_configuration) == 0
-    error_message = "A runtime target without a credential type must not render a credential block (the gateway role is implicit)"
+    condition     = length(aws_bedrockagentcore_gateway_target.gateway_target["agent"].credential_provider_configuration[0].gateway_iam_role) == 1 && aws_bedrockagentcore_gateway_target.gateway_target["agent"].credential_provider_configuration[0].gateway_iam_role[0].service == null
+    error_message = "A runtime target without a credential type must render an empty gateway_iam_role block (no SigV4 service)"
   }
 
   assert {

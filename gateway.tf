@@ -174,14 +174,17 @@ resource "aws_bedrockagentcore_gateway_target" "gateway_target" {
     time_sleep.gateway_iam_policy_propagation
   ]
 
+  # AgentCore Runtime targets are always invoked with the gateway role: the service fills
+  # that default in when the block is omitted (which the provider then reports as an
+  # inconsistent result) and rejects a SigV4 service on it, so the module sends an empty
+  # gateway_iam_role block for them unless another credential type is chosen.
   dynamic "credential_provider_configuration" {
-    for_each = each.value.credential_provider_type != null ? [1] : []
+    for_each = each.value.credential_provider_type != null || each.value.type == "AGENTCORE_RUNTIME" ? [1] : []
 
     content {
-      # SigV4 with the gateway role (service/region only for SigV4-protected passthrough endpoints).
-      # AgentCore Runtime targets use the gateway role implicitly and reject this block.
+      # SigV4 with the gateway role; service/region only for SigV4-protected passthrough endpoints
       dynamic "gateway_iam_role" {
-        for_each = each.value.credential_provider_type == "GATEWAY_IAM_ROLE" ? [1] : []
+        for_each = each.value.credential_provider_type == "GATEWAY_IAM_ROLE" || (each.value.type == "AGENTCORE_RUNTIME" && each.value.credential_provider_type == null) ? [1] : []
         content {
           service = try(each.value.gateway_iam_role_config.service, null)
           region  = try(each.value.gateway_iam_role_config.region, null)

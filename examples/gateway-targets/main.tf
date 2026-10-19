@@ -138,10 +138,10 @@ module "terraform-aws-agentcore" {
 
     # The runtime above, reached as https://<gateway>/targets-example-support-agent/invocations
     support-agent = {
-      gateway_name = "agents-gateway"
-      description  = "Support agent runtime"
-      type         = "AGENTCORE_RUNTIME"
-      # No credential_provider_type: the gateway signs requests to the runtime with its own role
+      gateway_name             = "agents-gateway"
+      description              = "Support agent runtime"
+      type                     = "AGENTCORE_RUNTIME"
+      credential_provider_type = "GATEWAY_IAM_ROLE" # the default for runtime targets: the gateway role, no SigV4 service
       agentcore_runtime_config = {
         runtime_name = "support_agent"
         qualifier    = "DEFAULT"

@@ -539,8 +539,8 @@ variable "gateway_targets" {
     description              = optional(string)
     credential_provider_type = optional(string) # "GATEWAY_IAM_ROLE", "API_KEY", "OAUTH", "JWT_PASSTHROUGH" or "CALLER_IAM_CREDENTIALS"
 
-    # GATEWAY_IAM_ROLE: SigV4 signing of upstream requests with the gateway role (not for AGENTCORE_RUNTIME
-    # targets, which use the gateway role implicitly); service/region only for SigV4-protected endpoints
+    # GATEWAY_IAM_ROLE: the gateway role signs upstream requests (the default for AGENTCORE_RUNTIME targets);
+    # service/region are only for SigV4-protected passthrough endpoints, never for runtime targets
     gateway_iam_role_config = optional(object({
       service = optional(string)
       region  = optional(string)
@@ -775,9 +775,9 @@ variable "gateway_targets" {
   validation {
     condition = alltrue([
       for name, config in var.gateway_targets :
-      !(config.type == "AGENTCORE_RUNTIME" && config.credential_provider_type == "GATEWAY_IAM_ROLE")
+      config.type != "AGENTCORE_RUNTIME" || config.gateway_iam_role_config == null
     ])
-    error_message = "AGENTCORE_RUNTIME targets use the gateway role implicitly and the service rejects an IAM credential provider for them: leave credential_provider_type unset, or use CALLER_IAM_CREDENTIALS, OAUTH or JWT_PASSTHROUGH."
+    error_message = "AGENTCORE_RUNTIME targets are invoked with the gateway role as is; the service rejects a SigV4 service or region (gateway_iam_role_config) on them."
   }
 
   validation {
