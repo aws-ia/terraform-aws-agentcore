@@ -40,4 +40,19 @@ run "apply_agent_registry" {
     condition     = contains(keys(module.terraform-aws-agentcore.registry_record_ids), "team-agent-registry/weather-mcp-server")
     error_message = "Should create the weather-mcp-server record in team-agent-registry"
   }
+
+  assert {
+    condition     = alltrue([for arn in values(module.terraform-aws-agentcore.registry_arns) : startswith(arn, "arn:aws:agent-registry:")])
+    error_message = "Registries should live in the agent-registry namespace"
+  }
+
+  assert {
+    condition     = alltrue([for arn in values(module.terraform-aws-agentcore.registry_publisher_role_arns) : endswith(arn, ":role/registry-example-team-agent-registry-registry-publisher")])
+    error_message = "The publisher role should follow the <project_prefix>-<registry>-registry-publisher naming"
+  }
+
+  assert {
+    condition     = alltrue([for status in values(module.terraform-aws-agentcore.registry_statuses) : status != ""])
+    error_message = "Registries should report a status after apply"
+  }
 }

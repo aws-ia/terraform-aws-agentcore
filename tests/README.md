@@ -21,7 +21,9 @@ terraform test -filter='run.plan_*'
 
 Ordered from simplest to most complex:
 
-- `00_unit_mocked.tftest.hcl` - Provider-mocked plan + apply of every example; no AWS credentials or resources needed (seconds)
+- `00_unit_mocked.tftest.hcl` - Provider-mocked plan + apply of every example; no AWS credentials or resources needed (about a minute)
+- `00_unit_resources.tftest.hcl` - Root-module unit tests with mocked providers: asserts on rendered resources (placeholder resolution, Cedar vs Dogwood definitions, IAM statements, gateway and target blocks, registry descriptors) (seconds)
+- `00_unit_validations.tftest.hcl` - 48 negative tests, one invalid input each, expecting the matching variable validation to fail (seconds)
 - `01_basic_code_runtime.tftest.hcl` - CODE runtime with ARM64 CodeBuild (~3-5min)
 - `02_basic_container_runtime.tftest.hcl` - CONTAINER runtime with ARM64 CodeBuild (~5-10min)
 - `03_complete.tftest.hcl` - All resources: 2 runtimes, memory, gateway, gateway target, browser, code interpreter (~10-15min)
@@ -33,12 +35,20 @@ Ordered from simplest to most complex:
 
 ## Mocked Unit Tests
 
-`00_unit_mocked.tftest.hcl` runs every example against `mock_provider` blocks for `aws`, `awscc` and `time`. Mock defaults only set the attributes providers validate on the client side (ARN and ID formats), so the run exercises variable validation, placeholder resolution, IAM documents and the full resource graph without touching an AWS account:
+The three `00_unit_*` files run against `mock_provider` blocks for `aws`, `awscc` and `time`. Mock defaults only set the attributes providers validate on the client side (ARN and ID formats), so the runs exercise variable validation, placeholder resolution, IAM documents and the full resource graph without touching an AWS account:
+
+- `00_unit_mocked` applies every example (end to end through the module).
+- `00_unit_resources` feeds the root module variables directly and asserts on resource attributes, for example that `{{target:orders}}` resolves to `unit-orders` in a Cedar statement, that a Dogwood statement lands in `definition.policy`, or that the gateway role gets `AllowAgentRuntimeInvocation` for a runtime target.
+- `00_unit_validations` proves each validation rule rejects bad input with `expect_failures`.
 
 ```bash
 terraform init
 terraform test -filter=tests/00_unit_mocked.tftest.hcl
+terraform test -filter=tests/00_unit_resources.tftest.hcl
+terraform test -filter=tests/00_unit_validations.tftest.hcl
 ```
+
+Mocked state fills computed attributes with generated values, so these tests assert on configured values and on outputs, never on "attribute is null".
 
 **Note:** All runtime tests use CodeBuild to build ARM64 packages/images automatically. No local Docker required.
 
