@@ -104,3 +104,26 @@ locals {
     }
   ]...)
 }
+
+# =============================================================================
+# CONFIGURATION BUNDLES
+# =============================================================================
+
+locals {
+  # Component identifier => { configuration = <json> }, resolving placeholders in the identifier.
+  configuration_bundle_components = {
+    for bundle_name, bundle in var.configuration_bundles : bundle_name => {
+      for component_id, configuration in bundle.components :
+      join("", [
+        for i, part in split("{{", component_id) : (
+          i == 0 ? part : [
+            for key in [try(regex("^((?:gateway|target|runtime):[A-Za-z0-9_.-]+)}}", part)[0], "")] :
+            lookup(local.placeholder_values, key, null) != null
+            ? "${lookup(local.placeholder_values, key, null)}${substr(part, length(key) + 2, -1)}"
+            : "{{${part}"
+          ][0]
+        )
+      ]) => { configuration = jsonencode(configuration) }
+    }
+  }
+}

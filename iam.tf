@@ -133,6 +133,21 @@ data "aws_iam_policy_document" "runtime_policy" {
     ]
   }
 
+  # Configuration bundles: the AgentCore SDK resolves the bundle version named in
+  # the request baggage through the control plane
+  dynamic "statement" {
+    for_each = length(var.configuration_bundles) > 0 ? [1] : []
+    content {
+      sid    = "AllowConfigurationBundleRead"
+      effect = "Allow"
+      actions = [
+        "bedrock-agentcore:GetConfigurationBundle",
+        "bedrock-agentcore:GetConfigurationBundleVersion"
+      ]
+      resources = ["arn:aws:bedrock-agentcore:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:configuration-bundle/*"]
+    }
+  }
+
   # CODE: S3 read permissions
   dynamic "statement" {
     for_each = each.value.source_type == "CODE" ? [1] : []

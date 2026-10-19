@@ -665,3 +665,34 @@ variable "policy_engines" {
     error_message = "Policy validation_mode must be either 'FAIL_ON_ANY_FINDINGS' or 'IGNORE_ALL_FINDINGS'."
   }
 }
+
+# – Agent Core Configuration Bundles –
+
+variable "configuration_bundles" {
+  description = "Map of AgentCore configuration bundles to create. Each key is the bundle name. components maps a component identifier (an AgentCore resource ARN, or a {{runtime:<name>}} / {{gateway:<name>}} placeholder for a resource created by this module) to its configuration object, which is stored as JSON."
+  type = map(object({
+    description    = optional(string)
+    branch_name    = optional(string) # defaults to "mainline"
+    commit_message = optional(string)
+    kms_key_arn    = optional(string)
+    components     = any # map of component identifier => configuration object
+    tags           = optional(map(string))
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for name, config in var.configuration_bundles :
+      can(regex("^[a-zA-Z][a-zA-Z0-9_]{0,99}$", name))
+    ])
+    error_message = "Configuration bundle names must start with a letter and contain only letters, numbers, and underscores (max 100 characters, no hyphens)."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.configuration_bundles :
+      can(keys(config.components)) && length(keys(config.components)) > 0
+    ])
+    error_message = "Each configuration bundle needs at least one component (a map of component identifier => configuration object)."
+  }
+}

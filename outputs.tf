@@ -271,3 +271,22 @@ output "policy_statuses" {
   description = "Map of '<policy engine name>/<policy name>' to policy statuses"
   value       = { for k, v in awscc_bedrockagentcore_policy.policy : k => v.status }
 }
+
+# =============================================================================
+# CONFIGURATION BUNDLE OUTPUTS
+# =============================================================================
+
+output "configuration_bundle_ids" {
+  description = "Map of configuration bundle names to their IDs"
+  value       = { for k, v in awscc_bedrockagentcore_configuration_bundle.bundle : k => v.bundle_id }
+}
+
+output "configuration_bundle_arns" {
+  description = "Map of configuration bundle names to their ARNs (use with the aws.agentcore.configbundle_arn baggage key)"
+  value       = { for k, v in awscc_bedrockagentcore_configuration_bundle.bundle : k => v.bundle_arn }
+}
+
+output "configuration_bundle_version_ids" {
+  description = "Map of configuration bundle names to their current version IDs (use with the aws.agentcore.configbundle_version baggage key)"
+  value       = { for k, v in awscc_bedrockagentcore_configuration_bundle.bundle : k => v.version_id }
+}

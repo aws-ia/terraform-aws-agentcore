@@ -95,6 +95,14 @@ locals {
       }
     }
   }
+
+  debug_configuration_bundles = {
+    for name, config in var.configuration_bundles : name => {
+      id         = awscc_bedrockagentcore_configuration_bundle.bundle[name].bundle_id
+      arn        = awscc_bedrockagentcore_configuration_bundle.bundle[name].bundle_arn
+      version_id = awscc_bedrockagentcore_configuration_bundle.bundle[name].version_id
+    }
+  }
 }
 
 resource "local_file" "debug_env" {
@@ -119,6 +127,7 @@ resource "local_file" "debug_env" {
     length(local.debug_workload_identities) > 0 ? ["WORKLOAD_IDENTITIES='${jsonencode(local.debug_workload_identities)}'"] : [],
     length(local.debug_registries) > 0 ? ["REGISTRIES='${jsonencode(local.debug_registries)}'"] : [],
     length(local.debug_policy_engines) > 0 ? ["POLICY_ENGINES='${jsonencode(local.debug_policy_engines)}'"] : [],
+    length(local.debug_configuration_bundles) > 0 ? ["CONFIGURATION_BUNDLES='${jsonencode(local.debug_configuration_bundles)}'"] : [],
     [""],
     ["# S3/ECR Resources"],
     length(aws_s3_bucket.runtime) > 0 ? ["S3_BUCKETS='${jsonencode({for k, v in aws_s3_bucket.runtime : k => v.id})}'"] : [],
