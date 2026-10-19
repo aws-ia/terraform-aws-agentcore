@@ -43,3 +43,64 @@ locals {
     if config.publisher.create_policy && (length(config.publisher.trusted_principal_arns) + length(config.publisher.trusted_services)) > 0
   }
 }
+
+# =============================================================================
+# PLACEHOLDER RESOLUTION
+# =============================================================================
+# Policy statements and configuration bundle component keys often need the ARN
+# or name of a resource created in the same module call, which is only known
+# after apply. These placeholders are replaced before the value is sent to AWS
+# (the same convention the AgentCore CLI uses):
+#   {{gateway:<name>}} -> gateway ARN
+#   {{target:<name>}}  -> gateway target name (gateway tools are named <target name>___<tool>)
+#   {{runtime:<name>}} -> runtime ARN
+
+locals {
+  placeholder_values = merge(
+    { for k, v in awscc_bedrockagentcore_gateway.gateway : "gateway:${k}" => v.gateway_arn },
+    { for k, v in aws_bedrockagentcore_gateway_target.gateway_target : "target:${k}" => v.name },
+    { for k, v in awscc_bedrockagentcore_runtime.runtime_code : "runtime:${k}" => v.agent_runtime_arn },
+    { for k, v in awscc_bedrockagentcore_runtime.runtime_container : "runtime:${k}" => v.agent_runtime_arn }
+  )
+}
+
+# =============================================================================
+# POLICY ENGINES & POLICIES
+# =============================================================================
+
+locals {
+  # Policy engine ARN per gateway that attaches one (module-managed by name or given by ARN)
+  gateway_policy_engine_arns = {
+    for name, config in var.gateways :
+    name => coalesce(
+      config.policy_engine_configuration.policy_engine_arn,
+      try(awscc_bedrockagentcore_policy_engine.policy_engine[config.policy_engine_configuration.policy_engine_name].policy_engine_arn, null)
+    )
+    if config.policy_engine_configuration != null
+  }
+
+  # Flatten policy engines -> policies into one map keyed "<engine>/<policy>",
+  # resolving placeholders in the statement text.
+  policies = merge([
+    for engine_name, engine in var.policy_engines : {
+      for policy in engine.policies : "${engine_name}/${policy.name}" => {
+        engine_name      = engine_name
+        name             = policy.name
+        description      = policy.description
+        language         = policy.language
+        enforcement_mode = policy.enforcement_mode
+        validation_mode  = policy.validation_mode
+        statement = join("", [
+          for i, part in split("{{", policy.statement) : (
+            i == 0 ? part : [
+              for key in [try(regex("^((?:gateway|target|runtime):[A-Za-z0-9_.-]+)}}", part)[0], "")] :
+              lookup(local.placeholder_values, key, null) != null
+              ? "${lookup(local.placeholder_values, key, null)}${substr(part, length(key) + 2, -1)}"
+              : "{{${part}"
+            ][0]
+          )
+        ])
+      }
+    }
+  ]...)
+}

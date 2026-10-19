@@ -278,6 +278,13 @@ variable "gateways" {
         pass_request_headers = optional(bool, false)
       }))
     })), [])
+
+    # Attach a policy engine (module-managed by name, or an existing one by ARN)
+    policy_engine_configuration = optional(object({
+      policy_engine_name = optional(string)
+      policy_engine_arn  = optional(string)
+      mode               = optional(string, "ENFORCE") # "ENFORCE" or "LOG_ONLY"
+    }))
     
     tags = optional(map(string))
   }))
@@ -289,6 +296,32 @@ variable "gateways" {
       can(regex("^([0-9a-zA-Z][-]?){1,100}$", name))
     ])
     error_message = "Gateway names must match pattern ^([0-9a-zA-Z][-]?){1,100}$ (alphanumeric with optional hyphens, no underscores)."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateways :
+      config.policy_engine_configuration == null || (
+        (config.policy_engine_configuration.policy_engine_name != null) != (config.policy_engine_configuration.policy_engine_arn != null)
+      )
+    ])
+    error_message = "policy_engine_configuration requires exactly one of policy_engine_name (a key of var.policy_engines) or policy_engine_arn."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateways :
+      config.policy_engine_configuration == null || config.policy_engine_configuration.policy_engine_name == null || contains(keys(var.policy_engines), config.policy_engine_configuration.policy_engine_name)
+    ])
+    error_message = "policy_engine_configuration.policy_engine_name must reference a key of var.policy_engines."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateways :
+      config.policy_engine_configuration == null || contains(["ENFORCE", "LOG_ONLY"], config.policy_engine_configuration.mode)
+    ])
+    error_message = "policy_engine_configuration.mode must be either 'ENFORCE' or 'LOG_ONLY'."
   }
 }
 
@@ -552,5 +585,83 @@ variable "registries" {
       ]
     ]))
     error_message = "Registry record names must start with a letter or number and contain only letters, numbers, '_', '-', '.' and '/'."
+  }
+}
+
+# – Agent Core Policy –
+
+variable "policy_engines" {
+  description = "Map of AgentCore policy engines to create. Each key is the policy engine name. Attach an engine to a gateway with the gateway's policy_engine_configuration. Statements may use {{gateway:<name>}}, {{target:<name>}} and {{runtime:<name>}} placeholders, which resolve to resources created by this module."
+  type = map(object({
+    description        = optional(string)
+    encryption_key_arn = optional(string)
+
+    policies = optional(list(object({
+      name             = string
+      description      = optional(string)
+      statement        = string                                   # Cedar or Dogwood policy text
+      language         = optional(string, "CEDAR")                # "CEDAR" or "DOGWOOD" (temporal rules, guardrails)
+      enforcement_mode = optional(string, "ACTIVE")               # "ACTIVE" or "LOG_ONLY"
+      validation_mode  = optional(string, "FAIL_ON_ANY_FINDINGS") # "FAIL_ON_ANY_FINDINGS" or "IGNORE_ALL_FINDINGS"
+    })), [])
+
+    tags = optional(map(string))
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for name, config in var.policy_engines :
+      can(regex("^[A-Za-z][A-Za-z0-9_]{0,47}$", name))
+    ])
+    error_message = "Policy engine names must start with a letter and contain only letters, numbers, and underscores (max 48 characters, no hyphens)."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for name, config in var.policy_engines : [
+        for policy in config.policies :
+        can(regex("^[A-Za-z][A-Za-z0-9_]{0,47}$", policy.name))
+      ]
+    ]))
+    error_message = "Policy names must start with a letter and contain only letters, numbers, and underscores (max 48 characters, no hyphens)."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.policy_engines :
+      length(distinct([for policy in config.policies : policy.name])) == length(config.policies)
+    ])
+    error_message = "Policy names must be unique within a policy engine."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for name, config in var.policy_engines : [
+        for policy in config.policies :
+        contains(["CEDAR", "DOGWOOD"], policy.language)
+      ]
+    ]))
+    error_message = "Policy language must be either 'CEDAR' or 'DOGWOOD'."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for name, config in var.policy_engines : [
+        for policy in config.policies :
+        contains(["ACTIVE", "LOG_ONLY"], policy.enforcement_mode)
+      ]
+    ]))
+    error_message = "Policy enforcement_mode must be either 'ACTIVE' or 'LOG_ONLY'."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for name, config in var.policy_engines : [
+        for policy in config.policies :
+        contains(["FAIL_ON_ANY_FINDINGS", "IGNORE_ALL_FINDINGS"], policy.validation_mode)
+      ]
+    ]))
+    error_message = "Policy validation_mode must be either 'FAIL_ON_ANY_FINDINGS' or 'IGNORE_ALL_FINDINGS'."
   }
 }

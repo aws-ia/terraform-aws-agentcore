@@ -45,7 +45,16 @@ resource "awscc_bedrockagentcore_gateway" "gateway" {
     }
   ] : null
 
+  # Policy engine attachment (ENFORCE or LOG_ONLY). The gateway role needs the
+  # policy engine permissions (see iam.tf) before the engine can be attached.
+  policy_engine_configuration = each.value.policy_engine_configuration != null ? {
+    arn  = local.gateway_policy_engine_arns[each.key]
+    mode = each.value.policy_engine_configuration.mode
+  } : null
+
   tags = merge(local.merged_tags, each.value.tags)
+
+  depends_on = [time_sleep.gateway_iam_policy_propagation]
 }
 
 # ─── Gateway Targets ───

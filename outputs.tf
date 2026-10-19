@@ -237,3 +237,37 @@ output "registry_record_arns" {
   description = "Map of '<registry name>/<record name>' to registry record ARNs"
   value       = { for k, v in awscc_agentregistry_registry_record.record : k => v.record_arn }
 }
+
+# =============================================================================
+# POLICY OUTPUTS
+# =============================================================================
+
+output "policy_engine_ids" {
+  description = "Map of policy engine names to their IDs"
+  value       = { for k, v in awscc_bedrockagentcore_policy_engine.policy_engine : k => v.policy_engine_id }
+}
+
+output "policy_engine_arns" {
+  description = "Map of policy engine names to their ARNs"
+  value       = { for k, v in awscc_bedrockagentcore_policy_engine.policy_engine : k => v.policy_engine_arn }
+}
+
+output "policy_engine_statuses" {
+  description = "Map of policy engine names to their statuses"
+  value       = { for k, v in awscc_bedrockagentcore_policy_engine.policy_engine : k => v.status }
+}
+
+output "policy_ids" {
+  description = "Map of '<policy engine name>/<policy name>' to policy IDs"
+  value       = { for k, v in awscc_bedrockagentcore_policy.policy : k => v.policy_id }
+}
+
+output "policy_arns" {
+  description = "Map of '<policy engine name>/<policy name>' to policy ARNs"
+  value       = { for k, v in awscc_bedrockagentcore_policy.policy : k => v.policy_arn }
+}
+
+output "policy_statuses" {
+  description = "Map of '<policy engine name>/<policy name>' to policy statuses"
+  value       = { for k, v in awscc_bedrockagentcore_policy.policy : k => v.status }
+}

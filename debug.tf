@@ -84,6 +84,17 @@ locals {
       }
     }
   }
+
+  debug_policy_engines = {
+    for name, config in var.policy_engines : name => {
+      id  = awscc_bedrockagentcore_policy_engine.policy_engine[name].policy_engine_id
+      arn = awscc_bedrockagentcore_policy_engine.policy_engine[name].policy_engine_arn
+      policies = {
+        for key, policy in awscc_bedrockagentcore_policy.policy : policy.name => policy.policy_id
+        if local.policies[key].engine_name == name
+      }
+    }
+  }
 }
 
 resource "local_file" "debug_env" {
@@ -107,6 +118,7 @@ resource "local_file" "debug_env" {
     length(local.debug_gateway_targets) > 0 ? ["GATEWAY_TARGETS='${jsonencode(local.debug_gateway_targets)}'"] : [],
     length(local.debug_workload_identities) > 0 ? ["WORKLOAD_IDENTITIES='${jsonencode(local.debug_workload_identities)}'"] : [],
     length(local.debug_registries) > 0 ? ["REGISTRIES='${jsonencode(local.debug_registries)}'"] : [],
+    length(local.debug_policy_engines) > 0 ? ["POLICY_ENGINES='${jsonencode(local.debug_policy_engines)}'"] : [],
     [""],
     ["# S3/ECR Resources"],
     length(aws_s3_bucket.runtime) > 0 ? ["S3_BUCKETS='${jsonencode({for k, v in aws_s3_bucket.runtime : k => v.id})}'"] : [],

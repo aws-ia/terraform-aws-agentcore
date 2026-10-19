@@ -397,6 +397,49 @@ data "aws_iam_policy_document" "gateway_policy" {
       ]
     }
   }
+
+  # Policy engine: read the engine configuration and evaluate policies
+  # (required before a policy engine can be attached to the gateway)
+  dynamic "statement" {
+    for_each = each.value.policy_engine_configuration != null ? [1] : []
+    content {
+      sid       = "AllowPolicyEngineConfiguration"
+      effect    = "Allow"
+      actions   = ["bedrock-agentcore:GetPolicyEngine"]
+      resources = [local.gateway_policy_engine_arns[each.key]]
+    }
+  }
+
+  dynamic "statement" {
+    for_each = each.value.policy_engine_configuration != null ? [1] : []
+    content {
+      sid    = "AllowPolicyEngineAuthorization"
+      effect = "Allow"
+      actions = [
+        "bedrock-agentcore:AuthorizeAction",
+        "bedrock-agentcore:PartiallyAuthorizeActions"
+      ]
+      resources = [
+        local.gateway_policy_engine_arns[each.key],
+        "arn:aws:bedrock-agentcore:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:gateway/${each.key}-*"
+      ]
+    }
+  }
+
+  # Temporal (Dogwood) policies: the gateway mints a workload access token to
+  # propagate the caller's policy session
+  dynamic "statement" {
+    for_each = each.value.policy_engine_configuration != null ? [1] : []
+    content {
+      sid       = "AllowPolicySessionWorkloadIdentity"
+      effect    = "Allow"
+      actions   = ["bedrock-agentcore:GetWorkloadAccessToken"]
+      resources = [
+        "arn:aws:bedrock-agentcore:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
+        "arn:aws:bedrock-agentcore:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${each.key}-*"
+      ]
+    }
+  }
 }
 
 # =============================================================================
