@@ -36,9 +36,9 @@ resource "aws_iam_role" "runtime" {
     if config.execution_role_arn == null
   }
 
-  name                 = "${var.project_prefix}-${each.key}-runtime"
-  assume_role_policy   = data.aws_iam_policy_document.runtime_assume_role.json
-  tags                 = local.merged_tags
+  name               = "${var.project_prefix}-${each.key}-runtime"
+  assume_role_policy = data.aws_iam_policy_document.runtime_assume_role.json
+  tags               = local.merged_tags
 }
 
 # Wait for IAM role propagation
@@ -86,9 +86,9 @@ data "aws_iam_policy_document" "runtime_policy" {
   }
 
   statement {
-    sid    = "AllowCloudWatchMetrics"
-    effect = "Allow"
-    actions = ["cloudwatch:PutMetricData"]
+    sid       = "AllowCloudWatchMetrics"
+    effect    = "Allow"
+    actions   = ["cloudwatch:PutMetricData"]
     resources = ["*"]
     condition {
       test     = "StringEquals"
@@ -402,9 +402,9 @@ data "aws_iam_policy_document" "gateway_policy" {
   dynamic "statement" {
     for_each = length([for k, v in var.gateway_targets : v if v.gateway_name == each.key && v.type == "LAMBDA"]) > 0 ? [1] : []
     content {
-      sid       = "AllowLambdaInvocation"
-      effect    = "Allow"
-      actions   = ["lambda:InvokeFunction"]
+      sid     = "AllowLambdaInvocation"
+      effect  = "Allow"
+      actions = ["lambda:InvokeFunction"]
       resources = [
         for k, v in var.gateway_targets :
         v.lambda_config.lambda_arn
@@ -446,9 +446,9 @@ data "aws_iam_policy_document" "gateway_policy" {
   dynamic "statement" {
     for_each = each.value.policy_engine_configuration != null ? [1] : []
     content {
-      sid       = "AllowPolicySessionWorkloadIdentity"
-      effect    = "Allow"
-      actions   = ["bedrock-agentcore:GetWorkloadAccessToken"]
+      sid     = "AllowPolicySessionWorkloadIdentity"
+      effect  = "Allow"
+      actions = ["bedrock-agentcore:GetWorkloadAccessToken"]
       resources = [
         "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
         "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${each.key}-*"

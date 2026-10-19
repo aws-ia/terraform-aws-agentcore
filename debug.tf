@@ -130,7 +130,7 @@ resource "local_file" "debug_env" {
     length(local.debug_configuration_bundles) > 0 ? ["CONFIGURATION_BUNDLES='${jsonencode(local.debug_configuration_bundles)}'"] : [],
     [""],
     ["# S3/ECR Resources"],
-    length(aws_s3_bucket.runtime) > 0 ? ["S3_BUCKETS='${jsonencode({for k, v in aws_s3_bucket.runtime : k => v.id})}'"] : [],
+    length(aws_s3_bucket.runtime) > 0 ? ["S3_BUCKETS='${jsonencode({ for k, v in aws_s3_bucket.runtime : k => v.id })}'"] : [],
     length(local.debug_ecr_repositories) > 0 ? ["ECR_REPOSITORIES='${jsonencode(local.debug_ecr_repositories)}'"] : [],
     [""]
   ))
@@ -143,15 +143,15 @@ resource "local_file" "test_runtime_script" {
   for_each = var.debug ? var.runtimes : {}
 
   filename = "${path.root}/autogen/test_${each.key}.sh"
-  content  = <<-EOT
+  content = <<-EOT
     #!/bin/bash
     # Auto-generated test script for runtime: ${each.key}
     # Usage: ./test_${each.key}.sh "Your test message"
 
     RUNTIME_ID="${try(
-      awscc_bedrockagentcore_runtime.runtime_code[each.key].agent_runtime_id,
-      awscc_bedrockagentcore_runtime.runtime_container[each.key].agent_runtime_id
-    )}"
+  awscc_bedrockagentcore_runtime.runtime_code[each.key].agent_runtime_id,
+  awscc_bedrockagentcore_runtime.runtime_container[each.key].agent_runtime_id
+)}"
     INPUT_TEXT="$${1:-Hello from test script}"
 
     echo "Testing runtime: ${each.key}"
@@ -166,5 +166,5 @@ resource "local_file" "test_runtime_script" {
       --output json
   EOT
 
-  file_permission = "0755"
+file_permission = "0755"
 }

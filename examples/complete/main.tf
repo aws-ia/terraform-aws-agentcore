@@ -113,14 +113,14 @@ module "terraform-aws-agentcore" {
   # Gateway for MCP Protocol
   gateways = {
     mcp-gateway = {
-      description       = "Gateway for Model Context Protocol connections"
-      protocol_type     = "MCP"
-      authorizer_type   = "AWS_IAM"
+      description     = "Gateway for Model Context Protocol connections"
+      protocol_type   = "MCP"
+      authorizer_type = "AWS_IAM"
       protocol_configuration = {
         mcp = {
-          instructions        = "Gateway for external service integration"
-          search_type         = "SEMANTIC"
-          supported_versions  = ["2025-11-25"]
+          instructions       = "Gateway for external service integration"
+          search_type        = "SEMANTIC"
+          supported_versions = ["2025-11-25"]
         }
       }
       tags = {
@@ -170,7 +170,7 @@ module "terraform-aws-agentcore" {
     web_browser = {
       description       = "Custom browser for web interaction"
       network_mode      = "PUBLIC"
-      recording_enabled = false  # Disabled - would need S3 bucket
+      recording_enabled = false # Disabled - would need S3 bucket
       tags = {
         Component = "Browser"
       }
