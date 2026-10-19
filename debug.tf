@@ -114,7 +114,7 @@ resource "local_file" "debug_env" {
     ["# Add .env to your .gitignore"],
     [""],
     ["# AWS Context"],
-    ["AWS_REGION=${data.aws_region.current.id}"],
+    ["AWS_REGION=${data.aws_region.current.region}"],
     ["AWS_ACCOUNT_ID=${data.aws_caller_identity.current.account_id}"],
     [""],
     ["# All Resources (JSON nested structure)"],
@@ -162,7 +162,7 @@ resource "local_file" "test_runtime_script" {
     aws bedrock-agent-runtime invoke-agent \
       --agent-runtime-id "$RUNTIME_ID" \
       --input-text "$INPUT_TEXT" \
-      --region ${data.aws_region.current.id} \
+      --region ${data.aws_region.current.region} \
       --output json
   EOT
 

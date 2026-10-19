@@ -56,7 +56,7 @@ resource "awscc_bedrockagentcore_runtime" "runtime_container" {
 
   agent_runtime_artifact = {
     container_configuration = {
-      container_uri = each.value.container_image_uri != null ? each.value.container_image_uri : "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.id}.amazonaws.com/${aws_ecr_repository.runtime[each.key].name}:${each.value.container_image_tag}"
+      container_uri = each.value.container_image_uri != null ? each.value.container_image_uri : "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.region}.amazonaws.com/${aws_ecr_repository.runtime[each.key].name}:${each.value.container_image_tag}"
     }
   }
 

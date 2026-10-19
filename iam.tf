@@ -128,8 +128,8 @@ data "aws_iam_policy_document" "runtime_policy" {
       "bedrock-agentcore:GetWorkloadAccessTokenForUserId"
     ]
     resources = [
-      "arn:aws:bedrock-agentcore:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
-      "arn:aws:bedrock-agentcore:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${each.key}-*"
+      "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
+      "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${each.key}-*"
     ]
   }
 
@@ -144,7 +144,7 @@ data "aws_iam_policy_document" "runtime_policy" {
         "bedrock-agentcore:GetConfigurationBundle",
         "bedrock-agentcore:GetConfigurationBundleVersion"
       ]
-      resources = ["arn:aws:bedrock-agentcore:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:configuration-bundle/*"]
+      resources = ["arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:configuration-bundle/*"]
     }
   }
 
@@ -262,7 +262,7 @@ data "aws_iam_policy_document" "codebuild_container_policy" {
       "logs:CreateLogStream",
       "logs:PutLogEvents"
     ]
-    resources = ["arn:aws:logs:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:log-group:/aws/codebuild/${var.project_prefix}-${each.key}-container*"]
+    resources = ["arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/codebuild/${var.project_prefix}-${each.key}-container*"]
   }
 
   statement {
@@ -312,7 +312,7 @@ data "aws_iam_policy_document" "codebuild_code_policy" {
       "logs:CreateLogStream",
       "logs:PutLogEvents"
     ]
-    resources = ["arn:aws:logs:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:log-group:/aws/codebuild/${var.project_prefix}-${each.key}-code*"]
+    resources = ["arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/codebuild/${var.project_prefix}-${each.key}-code*"]
   }
 
   statement {
@@ -436,7 +436,7 @@ data "aws_iam_policy_document" "gateway_policy" {
       ]
       resources = [
         local.gateway_policy_engine_arns[each.key],
-        "arn:aws:bedrock-agentcore:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:gateway/${each.key}-*"
+        "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:gateway/${each.key}-*"
       ]
     }
   }
@@ -450,8 +450,8 @@ data "aws_iam_policy_document" "gateway_policy" {
       effect    = "Allow"
       actions   = ["bedrock-agentcore:GetWorkloadAccessToken"]
       resources = [
-        "arn:aws:bedrock-agentcore:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
-        "arn:aws:bedrock-agentcore:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${each.key}-*"
+        "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
+        "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${each.key}-*"
       ]
     }
   }

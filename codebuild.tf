@@ -26,7 +26,7 @@ resource "aws_codebuild_project" "runtime_container" {
 
     environment_variable {
       name  = "AWS_DEFAULT_REGION"
-      value = data.aws_region.current.id
+      value = data.aws_region.current.region
     }
 
     environment_variable {
