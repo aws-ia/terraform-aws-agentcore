@@ -62,6 +62,41 @@ variable "runtimes" {
     }))
     environment_variables = optional(map(string), {})
 
+    # Protocol the agent serves ("HTTP", "MCP", "A2A" or "AGUI"; service default HTTP)
+    protocol_configuration = optional(string)
+    platform_version       = optional(string)
+
+    # Session lifecycle (seconds). Service defaults: 900 idle, 28800 max lifetime
+    lifecycle_configuration = optional(object({
+      idle_runtime_session_timeout = optional(number)
+      max_lifetime                 = optional(number)
+    }))
+
+    # HTTP headers forwarded to the agent (max 20; x-amzn-* only with the X-Amzn-Bedrock-AgentCore-Runtime-Custom- prefix)
+    request_header_allowlist = optional(list(string))
+
+    # Inbound JWT authorization (default: AWS IAM / SigV4)
+    authorizer_configuration = optional(object({
+      custom_jwt_authorizer = object({
+        discovery_url    = string
+        allowed_audience = optional(list(string))
+        allowed_clients  = optional(list(string))
+        allowed_scopes   = optional(list(string))
+        custom_claims = optional(list(object({
+          inbound_token_claim_name       = string
+          inbound_token_claim_value_type = optional(string, "STRING") # "STRING" or "STRING_ARRAY"
+          claim_match_operator           = optional(string, "EQUALS") # "EQUALS" (STRING), "CONTAINS" or "CONTAINS_ANY" (STRING_ARRAY)
+          match_value_string             = optional(string)
+          match_value_string_list        = optional(list(string))
+        })), [])
+        # Only accept requests whose identity chain includes these workloads (e.g. a gateway)
+        allowed_workload_configuration = optional(object({
+          workload_identities      = optional(list(string), [])
+          hosting_environment_arns = optional(list(string), [])
+        }))
+      })
+    }))
+
     create_endpoint      = optional(bool, true)
     endpoint_description = optional(string)
     tags                 = optional(map(string))
@@ -144,6 +179,70 @@ variable "runtimes" {
       config.execution_network_mode != "VPC" || config.execution_network_config != null
     ])
     error_message = "execution_network_config is required when execution_network_mode is VPC."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.runtimes :
+      config.protocol_configuration == null || contains(["HTTP", "MCP", "A2A", "AGUI"], config.protocol_configuration)
+    ])
+    error_message = "protocol_configuration must be one of: HTTP, MCP, A2A, AGUI."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.runtimes :
+      config.lifecycle_configuration == null || alltrue([
+        for seconds in [config.lifecycle_configuration.idle_runtime_session_timeout, config.lifecycle_configuration.max_lifetime] :
+        seconds == null || (seconds >= 60 && seconds <= 1209600)
+      ])
+    ])
+    error_message = "lifecycle_configuration values are in seconds and must be between 60 and 1209600 (microVM runtimes accept up to 28800)."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.runtimes :
+      config.lifecycle_configuration == null || config.lifecycle_configuration.idle_runtime_session_timeout == null || config.lifecycle_configuration.max_lifetime == null || config.lifecycle_configuration.idle_runtime_session_timeout <= config.lifecycle_configuration.max_lifetime
+    ])
+    error_message = "lifecycle_configuration.idle_runtime_session_timeout must be less than or equal to max_lifetime."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.runtimes :
+      config.request_header_allowlist == null || (
+        length(config.request_header_allowlist) <= 20 && alltrue([
+          for header in config.request_header_allowlist :
+          !startswith(lower(header), "x-amzn-") || startswith(lower(header), "x-amzn-bedrock-agentcore-runtime-custom-")
+        ])
+      )
+    ])
+    error_message = "request_header_allowlist accepts up to 20 headers; x-amzn-* headers are only allowed with the X-Amzn-Bedrock-AgentCore-Runtime-Custom- prefix."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.runtimes :
+      config.authorizer_configuration == null || (
+        try(length(config.authorizer_configuration.custom_jwt_authorizer.allowed_audience), 0) +
+        try(length(config.authorizer_configuration.custom_jwt_authorizer.allowed_clients), 0) +
+        try(length(config.authorizer_configuration.custom_jwt_authorizer.allowed_scopes), 0) +
+        length(config.authorizer_configuration.custom_jwt_authorizer.custom_claims)
+      ) > 0
+    ])
+    error_message = "custom_jwt_authorizer needs at least one of allowed_audience, allowed_clients, allowed_scopes or custom_claims."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for name, config in var.runtimes : [
+        for claim in(config.authorizer_configuration == null ? [] : config.authorizer_configuration.custom_jwt_authorizer.custom_claims) :
+        (claim.inbound_token_claim_value_type == "STRING" && claim.claim_match_operator == "EQUALS" && claim.match_value_string != null) ||
+        (claim.inbound_token_claim_value_type == "STRING_ARRAY" && contains(["CONTAINS", "CONTAINS_ANY"], claim.claim_match_operator) && claim.match_value_string_list != null)
+      ]
+    ]))
+    error_message = "custom_claims: STRING claims use claim_match_operator EQUALS with match_value_string; STRING_ARRAY claims use CONTAINS or CONTAINS_ANY with match_value_string_list."
   }
 }
 

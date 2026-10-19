@@ -127,3 +127,42 @@ locals {
     }
   }
 }
+
+# =============================================================================
+# RUNTIME INBOUND AUTHORIZATION
+# =============================================================================
+
+locals {
+  # awscc shape of the custom JWT authorizer per runtime (null when the runtime uses IAM)
+  runtime_authorizer_configurations = {
+    for name, config in var.runtimes : name => (
+      config.authorizer_configuration != null ? {
+        custom_jwt_authorizer = {
+          discovery_url    = config.authorizer_configuration.custom_jwt_authorizer.discovery_url
+          allowed_audience = config.authorizer_configuration.custom_jwt_authorizer.allowed_audience
+          allowed_clients  = config.authorizer_configuration.custom_jwt_authorizer.allowed_clients
+          allowed_scopes   = config.authorizer_configuration.custom_jwt_authorizer.allowed_scopes
+          custom_claims = length(config.authorizer_configuration.custom_jwt_authorizer.custom_claims) > 0 ? [
+            for claim in config.authorizer_configuration.custom_jwt_authorizer.custom_claims : {
+              inbound_token_claim_name       = claim.inbound_token_claim_name
+              inbound_token_claim_value_type = claim.inbound_token_claim_value_type
+              authorizing_claim_match_value = {
+                claim_match_operator = claim.claim_match_operator
+                claim_match_value = {
+                  match_value_string      = claim.match_value_string
+                  match_value_string_list = claim.match_value_string_list
+                }
+              }
+            }
+          ] : null
+          allowed_workload_configuration = config.authorizer_configuration.custom_jwt_authorizer.allowed_workload_configuration != null ? {
+            workload_identities = length(config.authorizer_configuration.custom_jwt_authorizer.allowed_workload_configuration.workload_identities) > 0 ? config.authorizer_configuration.custom_jwt_authorizer.allowed_workload_configuration.workload_identities : null
+            hosting_environments = length(config.authorizer_configuration.custom_jwt_authorizer.allowed_workload_configuration.hosting_environment_arns) > 0 ? [
+              for arn in config.authorizer_configuration.custom_jwt_authorizer.allowed_workload_configuration.hosting_environment_arns : { arn = arn }
+            ] : null
+          } : null
+        }
+      } : null
+    )
+  }
+}

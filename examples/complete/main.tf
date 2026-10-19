@@ -71,6 +71,14 @@ module "terraform-aws-agentcore" {
         LOG_LEVEL = "INFO"
       }
       create_endpoint = true
+
+      # Runtime attributes: protocol, session lifecycle and custom request headers
+      protocol_configuration = "HTTP"
+      lifecycle_configuration = {
+        idle_runtime_session_timeout = 900  # 15 minutes
+        max_lifetime                 = 3600 # 1 hour
+      }
+      request_header_allowlist = ["X-Amzn-Bedrock-AgentCore-Runtime-Custom-UserId"]
       tags = {
         RuntimeType = "CODE"
       }
