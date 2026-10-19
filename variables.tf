@@ -997,14 +997,14 @@ variable "policy_engines" {
     description        = optional(string)
     encryption_key_arn = optional(string)
 
-    policies = optional(list(object({
-      name             = string
+    # Policies keyed by policy name (Cedar or Dogwood text; placeholders are resolved)
+    policies = optional(map(object({
       description      = optional(string)
       statement        = string                                   # Cedar or Dogwood policy text
       language         = optional(string, "CEDAR")                # "CEDAR" or "DOGWOOD" (temporal rules, guardrails)
       enforcement_mode = optional(string, "ACTIVE")               # "ACTIVE" or "LOG_ONLY"
       validation_mode  = optional(string, "FAIL_ON_ANY_FINDINGS") # "FAIL_ON_ANY_FINDINGS" or "IGNORE_ALL_FINDINGS"
-    })), [])
+    })), {})
 
     tags = optional(map(string))
   }))
@@ -1021,19 +1021,11 @@ variable "policy_engines" {
   validation {
     condition = alltrue(flatten([
       for name, config in var.policy_engines : [
-        for policy in config.policies :
-        can(regex("^[A-Za-z][A-Za-z0-9_]{0,47}$", policy.name))
+        for policy_name, policy in config.policies :
+        can(regex("^[A-Za-z][A-Za-z0-9_]{0,47}$", policy_name))
       ]
     ]))
-    error_message = "Policy names must start with a letter and contain only letters, numbers, and underscores (max 48 characters, no hyphens)."
-  }
-
-  validation {
-    condition = alltrue([
-      for name, config in var.policy_engines :
-      length(distinct([for policy in config.policies : policy.name])) == length(config.policies)
-    ])
-    error_message = "Policy names must be unique within a policy engine."
+    error_message = "Policy names (the keys of policies) must start with a letter and contain only letters, numbers, and underscores (max 48 characters, no hyphens)."
   }
 
   validation {

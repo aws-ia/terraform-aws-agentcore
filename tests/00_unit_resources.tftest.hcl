@@ -112,23 +112,20 @@ run "policy_engine_rendering" {
     policy_engines = {
       orders_engine = {
         description = "Orders policies"
-        policies = [
-          {
-            name      = "AllowLookup"
+        policies = {
+          AllowLookup = {
             statement = "permit(principal, action == AgentCore::Action::\"{{target:orders}}___get_order\", resource == AgentCore::Gateway::\"{{gateway:orders-gateway}}\");"
-          },
-          {
-            name             = "RefundAfterLookup"
+          }
+          RefundAfterLookup = {
             language         = "DOGWOOD"
             enforcement_mode = "LOG_ONLY"
             validation_mode  = "IGNORE_ALL_FINDINGS"
             statement        = "permit(principal, action == AgentCore::Action::\"{{target:orders}}___refund_order\", resource == AgentCore::Gateway::\"{{gateway:orders-gateway}}\") when temporal { formerly within 5m AgentCore::Action::\"{{target:orders}}___get_order\"::request { eventResource: resource } };"
-          },
-          {
-            name      = "KeepsUnknownBraces"
+          }
+          KeepsUnknownBraces = {
             statement = "permit(principal, action, resource is AgentCore::Gateway) when { context.input.note like \"{{not-a-placeholder}}*\" };"
           }
-        ]
+        }
       }
     }
 

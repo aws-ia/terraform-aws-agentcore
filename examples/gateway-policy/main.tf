@@ -76,12 +76,11 @@ module "terraform-aws-agentcore" {
   policy_engines = {
     orders_policy_engine = {
       description = "Authorizes tool calls on the orders gateway"
-      policies = [
-        {
+      policies = {
+        AllowOrderLookup = {
           # An unconstrained principal is reported as "Overly Permissive" by the Cedar
           # analyzer and rejected under FAIL_ON_ANY_FINDINGS, so scope the permit to IAM
           # callers of this account (IAM principals carry their ARN in the id attribute).
-          name        = "AllowOrderLookup"
           description = "IAM callers from this account may look up an order"
           statement   = <<-EOT
             permit(
@@ -90,13 +89,12 @@ module "terraform-aws-agentcore" {
               resource == AgentCore::Gateway::"{{gateway:orders-gateway}}"
             ) when { principal.id like "*:${data.aws_caller_identity.current.account_id}:*" };
           EOT
-        },
-        {
+        }
+        FlagLargeRefunds = {
           # The analyzer reports a forbid on an action that no plain Cedar permit allows as
           # "Overly Restrictive" (the temporal permit below does not count), which is normal
           # for an observation policy: IGNORE_ALL_FINDINGS keeps the analyzer out of the way
           # while the policy collects data in LOG_ONLY mode.
-          name             = "FlagLargeRefunds"
           description      = "Refunds above 500 are denied once promoted to ACTIVE; LOG_ONLY observes first"
           enforcement_mode = "LOG_ONLY"
           validation_mode  = "IGNORE_ALL_FINDINGS"
@@ -107,9 +105,8 @@ module "terraform-aws-agentcore" {
               resource == AgentCore::Gateway::"{{gateway:orders-gateway}}"
             ) when { context.input.amount > 500 };
           EOT
-        },
-        {
-          name        = "RefundOnlyAfterLookup"
+        }
+        RefundOnlyAfterLookup = {
           description = "Temporal rule: a refund needs a successful order lookup earlier in the same policy session"
           language    = "DOGWOOD"
           statement   = <<-EOT
@@ -125,7 +122,7 @@ module "terraform-aws-agentcore" {
             };
           EOT
         }
-      ]
+      }
       tags = {
         Component = "Policy"
       }

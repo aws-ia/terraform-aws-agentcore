@@ -83,9 +83,9 @@ locals {
   # resolving placeholders in the statement text.
   policies = merge([
     for engine_name, engine in var.policy_engines : {
-      for policy in engine.policies : "${engine_name}/${policy.name}" => {
+      for policy_name, policy in engine.policies : "${engine_name}/${policy_name}" => {
         engine_name      = engine_name
-        name             = policy.name
+        name             = policy_name
         description      = policy.description
         language         = policy.language
         enforcement_mode = policy.enforcement_mode

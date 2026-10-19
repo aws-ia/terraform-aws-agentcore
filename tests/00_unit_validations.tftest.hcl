@@ -502,11 +502,11 @@ run "policy_engine_rejects_hyphenated_name" {
   expect_failures = [var.policy_engines]
 }
 
-run "policy_engine_rejects_duplicate_policy_names" {
+run "policy_engine_rejects_hyphenated_policy_name" {
   command = plan
 
   variables {
-    policy_engines = { e = { policies = [{ name = "P", statement = "permit(principal, action, resource is AgentCore::Gateway);" }, { name = "P", statement = "forbid(principal, action, resource is AgentCore::Gateway);" }] } }
+    policy_engines = { e = { policies = { "my-policy" = { statement = "permit(principal, action, resource is AgentCore::Gateway);" } } } }
   }
 
   expect_failures = [var.policy_engines]
@@ -516,7 +516,7 @@ run "policy_engine_rejects_unknown_language" {
   command = plan
 
   variables {
-    policy_engines = { e = { policies = [{ name = "P", language = "REGO", statement = "allow = true" }] } }
+    policy_engines = { e = { policies = { P = { language = "REGO", statement = "allow = true" } } } }
   }
 
   expect_failures = [var.policy_engines]
@@ -526,7 +526,7 @@ run "policy_engine_rejects_enforce_as_policy_mode" {
   command = plan
 
   variables {
-    policy_engines = { e = { policies = [{ name = "P", enforcement_mode = "ENFORCE", statement = "permit(principal, action, resource is AgentCore::Gateway);" }] } }
+    policy_engines = { e = { policies = { P = { enforcement_mode = "ENFORCE", statement = "permit(principal, action, resource is AgentCore::Gateway);" } } } }
   }
 
   expect_failures = [var.policy_engines]
@@ -536,7 +536,7 @@ run "policy_engine_rejects_unknown_validation_mode" {
   command = plan
 
   variables {
-    policy_engines = { e = { policies = [{ name = "P", validation_mode = "NONE", statement = "permit(principal, action, resource is AgentCore::Gateway);" }] } }
+    policy_engines = { e = { policies = { P = { validation_mode = "NONE", statement = "permit(principal, action, resource is AgentCore::Gateway);" } } } }
   }
 
   expect_failures = [var.policy_engines]
