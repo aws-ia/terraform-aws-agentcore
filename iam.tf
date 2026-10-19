@@ -571,3 +571,107 @@ data "aws_iam_policy_document" "code_interpreter_policy" {
     resources = ["arn:aws:logs:*:*:log-group:/aws/bedrock/agentcore/*"]
   }
 }
+
+# =============================================================================
+# AGENT REGISTRY IAM (publishers)
+# =============================================================================
+# A publisher is the pipeline or principal that writes registry records and
+# submits them for approval. The managed policy can be attached to an existing
+# pipeline role; a dedicated role is created when trusted principals or
+# services are given.
+
+data "aws_iam_policy_document" "registry_publisher_policy" {
+  for_each = local.registry_publisher_policies
+
+  statement {
+    sid    = "AllowRegistryRead"
+    effect = "Allow"
+    actions = [
+      "agent-registry:GetRegistry",
+      "agent-registry:ListRegistryRecords"
+    ]
+    resources = [awscc_agentregistry_registry.registry[each.key].registry_arn]
+  }
+
+  statement {
+    sid    = "AllowRegistryRecordPublishing"
+    effect = "Allow"
+    actions = [
+      "agent-registry:CreateRegistryRecord",
+      "agent-registry:GetRegistryRecord",
+      "agent-registry:UpdateRegistryRecord",
+      "agent-registry:DeleteRegistryRecord",
+      "agent-registry:SubmitRegistryRecordForApproval",
+      "agent-registry:TagResource",
+      "agent-registry:UntagResource",
+      "agent-registry:ListTagsForResource"
+    ]
+    resources = [
+      awscc_agentregistry_registry.registry[each.key].registry_arn,
+      "${awscc_agentregistry_registry.registry[each.key].registry_arn}/record/*"
+    ]
+  }
+
+  # Optional curator permission: approve, reject or deprecate records
+  dynamic "statement" {
+    for_each = each.value.publisher.allow_approval ? [1] : []
+    content {
+      sid       = "AllowRegistryRecordApproval"
+      effect    = "Allow"
+      actions   = ["agent-registry:UpdateRegistryRecordStatus"]
+      resources = ["${awscc_agentregistry_registry.registry[each.key].registry_arn}/record/*"]
+    }
+  }
+}
+
+resource "aws_iam_policy" "registry_publisher" {
+  for_each = local.registry_publisher_policies
+
+  name        = "${var.project_prefix}-${each.key}-registry-publisher"
+  description = "Write and submit AWS Agent Registry records in registry ${each.key}"
+  policy      = data.aws_iam_policy_document.registry_publisher_policy[each.key].json
+  tags        = local.merged_tags
+}
+
+data "aws_iam_policy_document" "registry_publisher_assume_role" {
+  for_each = local.registry_publisher_roles
+
+  dynamic "statement" {
+    for_each = length(each.value.publisher.trusted_principal_arns) > 0 ? [1] : []
+    content {
+      actions = ["sts:AssumeRole"]
+      effect  = "Allow"
+      principals {
+        type        = "AWS"
+        identifiers = each.value.publisher.trusted_principal_arns
+      }
+    }
+  }
+
+  dynamic "statement" {
+    for_each = length(each.value.publisher.trusted_services) > 0 ? [1] : []
+    content {
+      actions = ["sts:AssumeRole"]
+      effect  = "Allow"
+      principals {
+        type        = "Service"
+        identifiers = each.value.publisher.trusted_services
+      }
+    }
+  }
+}
+
+resource "aws_iam_role" "registry_publisher" {
+  for_each = local.registry_publisher_roles
+
+  name               = "${var.project_prefix}-${each.key}-registry-publisher"
+  assume_role_policy = data.aws_iam_policy_document.registry_publisher_assume_role[each.key].json
+  tags               = local.merged_tags
+}
+
+resource "aws_iam_role_policy_attachment" "registry_publisher" {
+  for_each = aws_iam_role.registry_publisher
+
+  role       = each.value.name
+  policy_arn = aws_iam_policy.registry_publisher[each.key].arn
+}

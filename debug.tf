@@ -73,6 +73,17 @@ locals {
       arn = aws_bedrockagentcore_workload_identity.workload_identity[name].workload_identity_arn
     }
   }
+
+  debug_registries = {
+    for name, config in var.registries : name => {
+      id  = awscc_agentregistry_registry.registry[name].registry_id
+      arn = awscc_agentregistry_registry.registry[name].registry_arn
+      records = {
+        for key, record in awscc_agentregistry_registry_record.record : record.name => record.record_id
+        if local.registry_records[key].registry_name == name
+      }
+    }
+  }
 }
 
 resource "local_file" "debug_env" {
@@ -95,6 +106,7 @@ resource "local_file" "debug_env" {
     length(local.debug_code_interpreters) > 0 ? ["CODE_INTERPRETERS='${jsonencode(local.debug_code_interpreters)}'"] : [],
     length(local.debug_gateway_targets) > 0 ? ["GATEWAY_TARGETS='${jsonencode(local.debug_gateway_targets)}'"] : [],
     length(local.debug_workload_identities) > 0 ? ["WORKLOAD_IDENTITIES='${jsonencode(local.debug_workload_identities)}'"] : [],
+    length(local.debug_registries) > 0 ? ["REGISTRIES='${jsonencode(local.debug_registries)}'"] : [],
     [""],
     ["# S3/ECR Resources"],
     length(aws_s3_bucket.runtime) > 0 ? ["S3_BUCKETS='${jsonencode({for k, v in aws_s3_bucket.runtime : k => v.id})}'"] : [],

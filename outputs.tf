@@ -198,3 +198,42 @@ output "gateway_workload_identity_arns" {
   description = "Map of gateway names to the ARN of the workload identity AgentCore created for the gateway"
   value       = { for k, v in awscc_bedrockagentcore_gateway.gateway : k => v.workload_identity_details.workload_identity_arn }
 }
+
+# =============================================================================
+# AGENT REGISTRY OUTPUTS
+# =============================================================================
+
+output "registry_ids" {
+  description = "Map of registry names to their IDs"
+  value       = { for k, v in awscc_agentregistry_registry.registry : k => v.registry_id }
+}
+
+output "registry_arns" {
+  description = "Map of registry names to their ARNs"
+  value       = { for k, v in awscc_agentregistry_registry.registry : k => v.registry_arn }
+}
+
+output "registry_statuses" {
+  description = "Map of registry names to their statuses"
+  value       = { for k, v in awscc_agentregistry_registry.registry : k => v.status }
+}
+
+output "registry_publisher_policy_arns" {
+  description = "Map of registry names to the ARN of the IAM policy that lets a publisher write and submit records"
+  value       = { for k, v in aws_iam_policy.registry_publisher : k => v.arn }
+}
+
+output "registry_publisher_role_arns" {
+  description = "Map of registry names to the ARN of the publisher IAM role (created when trusted principals or services are given)"
+  value       = { for k, v in aws_iam_role.registry_publisher : k => v.arn }
+}
+
+output "registry_record_ids" {
+  description = "Map of '<registry name>/<record name>' to registry record IDs"
+  value       = { for k, v in awscc_agentregistry_registry_record.record : k => v.record_id }
+}
+
+output "registry_record_arns" {
+  description = "Map of '<registry name>/<record name>' to registry record ARNs"
+  value       = { for k, v in awscc_agentregistry_registry_record.record : k => v.record_arn }
+}

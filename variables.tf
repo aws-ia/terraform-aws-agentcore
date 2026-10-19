@@ -421,3 +421,136 @@ variable "workload_identities" {
     error_message = "Workload identity names must be alphanumeric (plus ., _, -) and at most 255 characters."
   }
 }
+
+# – Agent Registry –
+
+variable "registries" {
+  description = "Map of AWS Agent Registry registries to create. Each key is the registry name. The module also creates an IAM policy (and optionally a role) that lets a publishing pipeline write and submit records; records can additionally be declared inline."
+  type = map(object({
+    description     = optional(string)
+    authorizer_type = optional(string, "AWS_IAM") # "AWS_IAM" or "CUSTOM_JWT"
+
+    authorizer_configuration = optional(object({
+      custom_jwt_authorizer = object({
+        discovery_url    = string
+        allowed_audience = optional(list(string))
+        allowed_clients  = optional(list(string))
+        allowed_scopes   = optional(list(string))
+      })
+    }))
+
+    auto_approve_records = optional(bool, false)
+    kms_key_arn          = optional(string)
+
+    auto_detection = optional(object({
+      enabled = optional(bool, true)
+      scope   = optional(string, "ORGANIZATION")
+    }))
+
+    custom_metadata_schema = optional(object({
+      default_schema = optional(string) # JSON Schema document
+      record_type_schema_overrides = optional(list(object({
+        record_type = string
+        schema      = string # JSON Schema document
+      })), [])
+    }))
+
+    # IAM for the publisher (the pipeline or principal that writes records)
+    publisher = optional(object({
+      create_policy          = optional(bool, true)
+      allow_approval         = optional(bool, false)
+      trusted_principal_arns = optional(list(string), []) # IAM principals that may assume the publisher role
+      trusted_services       = optional(list(string), []) # e.g. ["codebuild.amazonaws.com"]
+    }), {})
+
+    records = optional(map(object({
+      record_type                    = string           # "MCP", "AGENT", "SKILL" or "CUSTOM"
+      descriptor_type                = optional(string) # "MCP_SERVER", "A2A_AGENT_CARD", "AGENT_SKILLS_DEFINITION" or "CUSTOM" (defaults by record_type)
+      description                    = optional(string)
+      display_name                   = optional(string)
+      record_version                 = optional(string)
+      descriptor_data                = optional(string) # JSON document (MCP server.json, A2A agent card, skill definition or custom payload)
+      descriptor_data_schema_version = optional(string)
+      descriptor_source_url          = optional(string) # synchronize the descriptor from a URL instead of inline data
+      tools_data                     = optional(string) # MCP only: tools JSON document
+      tools_data_schema_version      = optional(string)
+      custom_metadata                = optional(string) # JSON object matching the registry's custom metadata schema
+      tags                           = optional(map(string))
+    })), {})
+
+    tags = optional(map(string))
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for name, config in var.registries :
+      can(regex("^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,99}$", name))
+    ])
+    error_message = "Registry names must start with a letter or number and contain only letters, numbers, '.', '_' and '-' (max 100 characters; '/' is valid for the service but not in the IAM policy names derived from it)."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.registries :
+      contains(["AWS_IAM", "CUSTOM_JWT"], config.authorizer_type)
+    ])
+    error_message = "Registry authorizer_type must be either 'AWS_IAM' or 'CUSTOM_JWT'."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.registries :
+      config.authorizer_type != "CUSTOM_JWT" || config.authorizer_configuration != null
+    ])
+    error_message = "authorizer_configuration.custom_jwt_authorizer is required when authorizer_type is CUSTOM_JWT."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.registries :
+      config.auto_detection == null || config.auto_detection.scope == "ORGANIZATION"
+    ])
+    error_message = "auto_detection.scope must be 'ORGANIZATION' (the only scope the service supports)."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for name, config in var.registries : [
+        for record_name, record in config.records :
+        contains(["MCP", "AGENT", "SKILL", "CUSTOM"], record.record_type)
+      ]
+    ]))
+    error_message = "Registry record record_type must be one of: MCP, AGENT, SKILL, CUSTOM."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for name, config in var.registries : [
+        for record_name, record in config.records :
+        record.descriptor_type == null || contains(["MCP_SERVER", "A2A_AGENT_CARD", "AGENT_SKILLS_DEFINITION", "CUSTOM"], record.descriptor_type)
+      ]
+    ]))
+    error_message = "Registry record descriptor_type must be one of: MCP_SERVER, A2A_AGENT_CARD, AGENT_SKILLS_DEFINITION, CUSTOM."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for name, config in var.registries : [
+        for record_name, record in config.records :
+        record.descriptor_data != null || record.descriptor_source_url != null
+      ]
+    ]))
+    error_message = "Registry records need descriptor_data (inline JSON) or descriptor_source_url."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for name, config in var.registries : [
+        for record_name, record in config.records :
+        can(regex("^[a-zA-Z0-9][a-zA-Z0-9_\\-\\./]*$", record_name))
+      ]
+    ]))
+    error_message = "Registry record names must start with a letter or number and contain only letters, numbers, '_', '-', '.' and '/'."
+  }
+}
