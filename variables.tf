@@ -521,11 +521,17 @@ variable "gateways" {
 }
 
 variable "gateway_targets" {
-  description = "Map of AgentCore gateway targets to create. Each key is the target name."
+  description = "Map of AgentCore gateway targets to create. Each key is the target name. MCP targets (LAMBDA, MCP_SERVER) attach to MCP gateways; HTTP targets (AGENTCORE_RUNTIME, HTTP_PASSTHROUGH) attach to gateways with protocol_type NONE."
   type = map(object({
     gateway_name             = string
     description              = optional(string)
-    credential_provider_type = optional(string)
+    credential_provider_type = optional(string) # "GATEWAY_IAM_ROLE", "API_KEY", "OAUTH", "JWT_PASSTHROUGH" or "CALLER_IAM_CREDENTIALS"
+
+    # GATEWAY_IAM_ROLE: SigV4 signing of upstream requests (service is set to bedrock-agentcore for AGENTCORE_RUNTIME targets)
+    gateway_iam_role_config = optional(object({
+      service = optional(string)
+      region  = optional(string)
+    }))
 
     api_key_config = optional(object({
       provider_arn              = string
@@ -535,12 +541,20 @@ variable "gateway_targets" {
     }))
 
     oauth_config = optional(object({
-      provider_arn      = string
-      scopes            = optional(list(string))
-      custom_parameters = optional(map(string))
+      provider_arn       = string
+      scopes             = optional(list(string))
+      custom_parameters  = optional(map(string))
+      grant_type         = optional(string) # "CLIENT_CREDENTIALS", "AUTHORIZATION_CODE" or "TOKEN_EXCHANGE"
+      default_return_url = optional(string)
     }))
 
-    type = string # "LAMBDA" or "MCP_SERVER"
+    # CALLER_IAM_CREDENTIALS: sign upstream requests with the caller's own identity
+    caller_iam_config = optional(object({
+      service = string
+      region  = optional(string)
+    }))
+
+    type = string # "LAMBDA", "MCP_SERVER", "AGENTCORE_RUNTIME" or "HTTP_PASSTHROUGH"
 
     lambda_config = optional(object({
       lambda_arn       = string
@@ -572,7 +586,58 @@ variable "gateway_targets" {
     }))
 
     mcp_server_config = optional(object({
-      endpoint = string
+      endpoint          = string
+      listing_mode      = optional(string) # "DEFAULT" or "DYNAMIC"
+      resource_priority = optional(number) # lower values win for shared resource URIs (service default 1000)
+
+      # Static tool schema: disables dynamic tool discovery and synchronization
+      tool_schema = optional(object({
+        inline_payload             = optional(string) # JSON tool definitions
+        s3_uri                     = optional(string)
+        s3_bucket_owner_account_id = optional(string)
+      }))
+    }))
+
+    # AGENTCORE_RUNTIME: route requests straight to a runtime (module-managed by name, or by ARN)
+    agentcore_runtime_config = optional(object({
+      runtime_name = optional(string)
+      runtime_arn  = optional(string)
+      qualifier    = optional(string) # runtime endpoint name (service default DEFAULT)
+
+      # OpenAPI or Smithy schema; needed for guardrails on HTTP-protocol runtimes
+      schema = optional(object({
+        inline_payload             = optional(string)
+        s3_uri                     = optional(string)
+        s3_bucket_owner_account_id = optional(string)
+      }))
+    }))
+
+    # HTTP_PASSTHROUGH: forward requests to an external HTTPS endpoint
+    passthrough_config = optional(object({
+      endpoint      = string
+      protocol_type = string # "MCP", "A2A", "INFERENCE" or "CUSTOM"
+
+      schema = optional(object({
+        inline_payload             = optional(string)
+        s3_uri                     = optional(string)
+        s3_bucket_owner_account_id = optional(string)
+      }))
+
+      static_query_parameters                    = optional(map(string))
+      static_query_parameter_conflict_resolution = optional(string) # "CLIENT_OVERRIDE" or "STATIC_OVERRIDE"
+
+      stickiness_configuration = optional(object({
+        identifier           = string # e.g. "$context.header.x-session-id"
+        composite_identifier = optional(list(string))
+        timeout              = optional(number) # seconds, 1-86400
+      }))
+    }))
+
+    # Header and query parameter propagation between client, gateway and target (max 10 each)
+    metadata_configuration = optional(object({
+      allowed_request_headers  = optional(list(string))
+      allowed_response_headers = optional(list(string))
+      allowed_query_parameters = optional(list(string))
     }))
   }))
   default = {}
@@ -583,6 +648,126 @@ variable "gateway_targets" {
       can(regex("^([0-9a-zA-Z][-]?){1,100}$", name))
     ])
     error_message = "Gateway target names must match pattern ^([0-9a-zA-Z][-]?){1,100}$ (alphanumeric with optional hyphens, no underscores)."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateway_targets :
+      contains(["LAMBDA", "MCP_SERVER", "AGENTCORE_RUNTIME", "HTTP_PASSTHROUGH"], config.type)
+    ])
+    error_message = "Gateway target type must be one of: LAMBDA, MCP_SERVER, AGENTCORE_RUNTIME, HTTP_PASSTHROUGH."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateway_targets :
+      contains(keys(var.gateways), config.gateway_name)
+    ])
+    error_message = "gateway_name must reference a key of var.gateways."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateway_targets :
+      !contains(keys(var.gateways), config.gateway_name) || (
+        contains(["LAMBDA", "MCP_SERVER"], config.type)
+        ? var.gateways[config.gateway_name].protocol_type == "MCP"
+        : var.gateways[config.gateway_name].protocol_type == "NONE"
+      )
+    ])
+    error_message = "LAMBDA and MCP_SERVER targets need a gateway with protocol_type MCP; AGENTCORE_RUNTIME and HTTP_PASSTHROUGH targets need a gateway with protocol_type NONE."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateway_targets :
+      (config.type != "LAMBDA" || config.lambda_config != null) &&
+      (config.type != "MCP_SERVER" || config.mcp_server_config != null) &&
+      (config.type != "AGENTCORE_RUNTIME" || config.agentcore_runtime_config != null) &&
+      (config.type != "HTTP_PASSTHROUGH" || config.passthrough_config != null)
+    ])
+    error_message = "Each gateway target needs the configuration block matching its type (lambda_config, mcp_server_config, agentcore_runtime_config or passthrough_config)."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateway_targets :
+      config.agentcore_runtime_config == null || (
+        (config.agentcore_runtime_config.runtime_name != null) != (config.agentcore_runtime_config.runtime_arn != null)
+      )
+    ])
+    error_message = "agentcore_runtime_config requires exactly one of runtime_name (a key of var.runtimes) or runtime_arn."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateway_targets :
+      config.agentcore_runtime_config == null || config.agentcore_runtime_config.runtime_name == null || contains(keys(var.runtimes), config.agentcore_runtime_config.runtime_name)
+    ])
+    error_message = "agentcore_runtime_config.runtime_name must reference a key of var.runtimes."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateway_targets :
+      config.passthrough_config == null || (
+        contains(["MCP", "A2A", "INFERENCE", "CUSTOM"], config.passthrough_config.protocol_type) &&
+        startswith(config.passthrough_config.endpoint, "https://") &&
+        (config.passthrough_config.static_query_parameter_conflict_resolution == null || contains(["CLIENT_OVERRIDE", "STATIC_OVERRIDE"], config.passthrough_config.static_query_parameter_conflict_resolution)) &&
+        (config.passthrough_config.stickiness_configuration == null || config.passthrough_config.stickiness_configuration.timeout == null || (config.passthrough_config.stickiness_configuration.timeout >= 1 && config.passthrough_config.stickiness_configuration.timeout <= 86400))
+      )
+    ])
+    error_message = "passthrough_config: endpoint must start with https://, protocol_type must be MCP, A2A, INFERENCE or CUSTOM, static_query_parameter_conflict_resolution must be CLIENT_OVERRIDE or STATIC_OVERRIDE, and stickiness timeout must be between 1 and 86400 seconds."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateway_targets :
+      config.mcp_server_config == null || (
+        (config.mcp_server_config.listing_mode == null || contains(["DEFAULT", "DYNAMIC"], config.mcp_server_config.listing_mode)) &&
+        (config.mcp_server_config.resource_priority == null || (config.mcp_server_config.resource_priority >= 0 && config.mcp_server_config.resource_priority <= 1000)) &&
+        (config.mcp_server_config.tool_schema == null || (config.mcp_server_config.tool_schema.inline_payload != null) != (config.mcp_server_config.tool_schema.s3_uri != null))
+      )
+    ])
+    error_message = "mcp_server_config: listing_mode must be DEFAULT or DYNAMIC, resource_priority must be between 0 and 1000, and tool_schema needs exactly one of inline_payload or s3_uri."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateway_targets :
+      alltrue([
+        for schema in [try(config.agentcore_runtime_config.schema, null), try(config.passthrough_config.schema, null)] :
+        schema == null || (schema.inline_payload != null) != (schema.s3_uri != null)
+      ])
+    ])
+    error_message = "A target schema needs exactly one of inline_payload or s3_uri."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateway_targets :
+      config.credential_provider_type == null || contains(["GATEWAY_IAM_ROLE", "API_KEY", "OAUTH", "JWT_PASSTHROUGH", "CALLER_IAM_CREDENTIALS"], config.credential_provider_type)
+    ])
+    error_message = "credential_provider_type must be one of: GATEWAY_IAM_ROLE, API_KEY, OAUTH, JWT_PASSTHROUGH, CALLER_IAM_CREDENTIALS."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateway_targets :
+      config.credential_provider_type != "CALLER_IAM_CREDENTIALS" || config.caller_iam_config != null
+    ])
+    error_message = "caller_iam_config (service, optional region) is required when credential_provider_type is CALLER_IAM_CREDENTIALS."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateway_targets :
+      config.metadata_configuration == null || alltrue([
+        for headers in [config.metadata_configuration.allowed_request_headers, config.metadata_configuration.allowed_response_headers, config.metadata_configuration.allowed_query_parameters] :
+        headers == null || length(headers) <= 10
+      ])
+    ])
+    error_message = "metadata_configuration allows at most 10 request headers, 10 response headers and 10 query parameters per target."
   }
 }
 

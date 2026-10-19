@@ -200,3 +200,26 @@ locals {
     )
   }
 }
+
+# =============================================================================
+# GATEWAY TARGETS
+# =============================================================================
+
+locals {
+  # Runtime ARNs by name (CODE and CONTAINER). Kept separate from placeholder_values,
+  # which also contains the gateway targets themselves.
+  runtime_arns = merge(
+    { for k, v in awscc_bedrockagentcore_runtime.runtime_code : k => v.agent_runtime_arn },
+    { for k, v in awscc_bedrockagentcore_runtime.runtime_container : k => v.agent_runtime_arn }
+  )
+
+  # Runtime ARN per AGENTCORE_RUNTIME target (module-managed by name, or given by ARN)
+  gateway_target_runtime_arns = {
+    for name, config in var.gateway_targets :
+    name => coalesce(
+      config.agentcore_runtime_config.runtime_arn,
+      try(local.runtime_arns[config.agentcore_runtime_config.runtime_name], null)
+    )
+    if config.type == "AGENTCORE_RUNTIME" && config.agentcore_runtime_config != null
+  }
+}

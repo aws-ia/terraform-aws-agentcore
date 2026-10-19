@@ -413,6 +413,25 @@ data "aws_iam_policy_document" "gateway_policy" {
     }
   }
 
+  # Allow invoking AgentCore Runtime targets (SigV4 with the gateway role). Module-managed
+  # runtimes are matched by name so the gateway does not have to wait for the runtime build.
+  dynamic "statement" {
+    for_each = length([for k, v in var.gateway_targets : v if v.gateway_name == each.key && v.type == "AGENTCORE_RUNTIME" && v.agentcore_runtime_config != null]) > 0 ? [1] : []
+    content {
+      sid     = "AllowAgentRuntimeInvocation"
+      effect  = "Allow"
+      actions = ["bedrock-agentcore:InvokeAgentRuntime"]
+      resources = flatten([
+        for k, v in var.gateway_targets : (
+          v.agentcore_runtime_config.runtime_arn != null
+          ? [v.agentcore_runtime_config.runtime_arn, "${v.agentcore_runtime_config.runtime_arn}/runtime-endpoint/*"]
+          : ["arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:runtime/${v.agentcore_runtime_config.runtime_name}-*"]
+        )
+        if v.gateway_name == each.key && v.type == "AGENTCORE_RUNTIME" && v.agentcore_runtime_config != null
+      ])
+    }
+  }
+
   # Policy engine: read the engine configuration and evaluate policies
   # (required before a policy engine can be attached to the gateway)
   dynamic "statement" {

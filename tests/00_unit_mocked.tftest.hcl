@@ -213,6 +213,30 @@ run "mock_configuration_bundles" {
   }
 }
 
+# ─── Gateway targets (JWT, MCP server schema, runtime and passthrough targets) ───
+
+run "mock_gateway_targets" {
+  command = apply
+  module {
+    source = "./examples/gateway-targets"
+  }
+  providers = {
+    aws   = aws
+    awscc = awscc
+    time  = time
+  }
+
+  assert {
+    condition     = length(keys(module.terraform-aws-agentcore.gateway_ids)) == 2
+    error_message = "Should plan exactly 2 gateways"
+  }
+
+  assert {
+    condition     = length(keys(module.terraform-aws-agentcore.gateway_target_ids)) == 3
+    error_message = "Should plan exactly 3 gateway targets"
+  }
+}
+
 # ─── Workload identity ───
 
 run "mock_workload_identity" {
