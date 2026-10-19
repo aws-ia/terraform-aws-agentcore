@@ -113,21 +113,21 @@ output "browser_role_arns" {
 
 output "gateway_ids" {
   description = "Map of gateway names to their IDs"
-  value       = { for k, v in awscc_bedrockagentcore_gateway.gateway : k => v.gateway_identifier }
+  value       = local.gateway_identifiers
 }
 
 output "gateway_arns" {
   description = "Map of gateway names to their ARNs"
-  value       = { for k, v in awscc_bedrockagentcore_gateway.gateway : k => v.gateway_arn }
+  value       = local.gateway_arns
 }
 
 output "gateway_urls" {
   description = "Map of gateway names to their URLs"
-  value       = { for k, v in awscc_bedrockagentcore_gateway.gateway : k => v.gateway_url }
+  value       = local.gateway_urls
 }
 
 output "gateway_statuses" {
-  description = "Map of gateway names to their statuses"
+  description = "Map of MCP gateway names to their statuses (gateways with protocol_type NONE do not expose a status)"
   value       = { for k, v in awscc_bedrockagentcore_gateway.gateway : k => v.status }
 }
 
@@ -137,7 +137,7 @@ output "gateway_role_arns" {
 }
 
 output "gateway_web_acl_arns" {
-  description = "Map of gateway names to the ARN of the AWS WAF web ACL associated with them (empty string when none)"
+  description = "Map of MCP gateway names to the ARN of the AWS WAF web ACL associated with them (empty string when none)"
   value       = { for k, v in awscc_bedrockagentcore_gateway.gateway : k => v.web_acl_arn }
 }
 
@@ -201,7 +201,7 @@ output "runtime_workload_identity_arns" {
 
 output "gateway_workload_identity_arns" {
   description = "Map of gateway names to the ARN of the workload identity AgentCore created for the gateway"
-  value       = { for k, v in awscc_bedrockagentcore_gateway.gateway : k => v.workload_identity_details.workload_identity_arn }
+  value       = local.gateway_workload_identity_arns
 }
 
 # =============================================================================

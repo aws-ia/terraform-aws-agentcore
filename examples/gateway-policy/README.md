@@ -9,7 +9,7 @@ This example puts an AgentCore Gateway under **Policy in AgentCore**: a policy e
 - Creates a gateway (`orders-gateway`, IAM authorization) with one gateway target per tool
 - Creates a policy engine (`orders_policy_engine`) and attaches it to the gateway in `ENFORCE` mode
 - Creates three policies on the engine:
-  - `AllowOrderLookup` (Cedar, `ACTIVE`): anyone the gateway authenticates may call `get_order`
+  - `AllowOrderLookup` (Cedar, `ACTIVE`): IAM callers from this account may call `get_order` (an unconstrained `principal` is rejected as "Overly Permissive" under the default `FAIL_ON_ANY_FINDINGS` validation)
   - `FlagLargeRefunds` (Cedar, `LOG_ONLY`): refunds above 500 are evaluated and logged, not yet denied
   - `RefundOnlyAfterLookup` (Dogwood, `ACTIVE`): a refund is permitted only if a successful `get_order` happened earlier in the same policy session
 - Grants the gateway role the permissions the policy engine needs (`bedrock-agentcore:GetPolicyEngine`, `AuthorizeAction`, `PartiallyAuthorizeActions`, and `GetWorkloadAccessToken` for temporal policies)
@@ -24,7 +24,7 @@ Cedar actions are named after the gateway target and the tool: `<target name>___
 | `{{target:orders-lookup}}` | the gateway target name (`policy-example-orders-lookup`) |
 | `{{runtime:<name>}}` | a runtime ARN (not used here) |
 
-Policies are created after the gateway and its targets, because the service validates every statement against the tools the gateway exposes (`validation_mode = "FAIL_ON_ANY_FINDINGS"` by default).
+Policies are created after the gateway and its targets, plus a 60-second propagation delay, because the service validates every statement against the tools the gateway exposes (`validation_mode = "FAIL_ON_ANY_FINDINGS"` by default) and a freshly created target's tools take a moment to become visible to the validator.
 
 ## Usage
 
@@ -81,6 +81,7 @@ No requirements.
 | [aws_iam_role_policy_attachment.lambda_basic](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
 | [aws_lambda_function.orders](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_function) | resource |
 | [archive_file.lambda_zip](https://registry.terraform.io/providers/hashicorp/archive/latest/docs/data-sources/file) | data source |
+| [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
 
 ## Inputs
 

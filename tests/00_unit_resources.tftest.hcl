@@ -38,6 +38,16 @@ mock_provider "aws" {
       arn = "arn:aws:lambda:us-east-1:123456789012:function:mock-function"
     }
   }
+  mock_resource "aws_bedrockagentcore_gateway" {
+    defaults = {
+      gateway_arn = "arn:aws:bedrock-agentcore:us-east-1:123456789012:gateway/mock-http-gateway-abcdefghij"
+      gateway_id  = "mock-http-gateway-abcdefghij"
+      gateway_url = "https://mock-http-gateway-abcdefghij.gateway.bedrock-agentcore.us-east-1.amazonaws.com"
+      workload_identity_details = [{
+        workload_identity_arn = "arn:aws:bedrock-agentcore:us-east-1:123456789012:workload-identity-directory/default/workload-identity/mock-http-gateway-abcdefghij"
+      }]
+    }
+  }
   mock_resource "aws_bedrockagentcore_workload_identity" {
     defaults = {
       workload_identity_arn = "arn:aws:bedrock-agentcore:us-east-1:123456789012:workload-identity-directory/default/workload-identity/mock-identity"
@@ -291,15 +301,26 @@ run "http_targets_and_runtime_attributes" {
         authorizer_type = "CUSTOM_JWT"
         authorizer_configuration = {
           custom_jwt_authorizer = {
-            discovery_url            = "https://idp.example.com/.well-known/openid-configuration"
-            allowed_scopes           = ["agents/invoke"]
-            advertised_scope_mapping = { "agents/invoke" = "invoke" }
+            discovery_url  = "https://idp.example.com/.well-known/openid-configuration"
+            allowed_scopes = ["agents/invoke"]
+            custom_claims = [{
+              inbound_token_claim_name = "token_use"
+              match_value_string       = "access"
+            }]
           }
         }
-        waf_configuration = {
-          failure_mode = "FAIL_OPEN"
-          web_acl_arn  = "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/agents/00000000-0000-0000-0000-000000000000"
+        policy_engine_configuration = {
+          policy_engine_arn = "arn:aws:bedrock-agentcore:us-east-1:123456789012:policy-engine/shared_engine-0123456789"
+          mode              = "LOG_ONLY"
         }
+        interceptor_configurations = [{
+          interception_points = ["REQUEST"]
+          interceptor = {
+            lambda = {
+              arn = "arn:aws:lambda:us-east-1:123456789012:function:interceptor"
+            }
+          }
+        }]
       }
     }
 
@@ -382,20 +403,35 @@ run "http_targets_and_runtime_attributes" {
     error_message = "The runtime role should get workload access tokens for its own identity"
   }
 
-  # gateway
+  # gateway without a protocol type: created with the aws provider resource
   assert {
-    condition     = awscc_bedrockagentcore_gateway.gateway["agents-gateway"].authorizer_configuration.custom_jwt_authorizer.advertised_scope_mapping["agents/invoke"] == "invoke"
-    error_message = "advertised_scope_mapping should pass through"
+    condition     = length(awscc_bedrockagentcore_gateway.gateway) == 0 && length(aws_bedrockagentcore_gateway.gateway_http) == 1
+    error_message = "A protocol_type NONE gateway must be an aws_bedrockagentcore_gateway, not an awscc gateway"
   }
 
   assert {
-    condition     = awscc_bedrockagentcore_gateway.gateway["agents-gateway"].waf_configuration.failure_mode == "FAIL_OPEN"
-    error_message = "waf_configuration.failure_mode should pass through"
+    condition     = aws_bedrockagentcore_gateway.gateway_http["agents-gateway"].authorizer_configuration[0].custom_jwt_authorizer[0].discovery_url == "https://idp.example.com/.well-known/openid-configuration" && contains(aws_bedrockagentcore_gateway.gateway_http["agents-gateway"].authorizer_configuration[0].custom_jwt_authorizer[0].allowed_scopes, "agents/invoke")
+    error_message = "The JWT authorizer should render as blocks on the aws gateway resource"
   }
 
   assert {
-    condition     = aws_wafv2_web_acl_association.gateway["agents-gateway"].resource_arn == awscc_bedrockagentcore_gateway.gateway["agents-gateway"].gateway_arn && endswith(aws_wafv2_web_acl_association.gateway["agents-gateway"].web_acl_arn, "/00000000-0000-0000-0000-000000000000")
-    error_message = "web_acl_arn should be associated with the gateway ARN"
+    condition     = [for c in aws_bedrockagentcore_gateway.gateway_http["agents-gateway"].authorizer_configuration[0].custom_jwt_authorizer[0].custom_claim : c.authorizing_claim_match_value[0].claim_match_value[0].match_value_string][0] == "access"
+    error_message = "Custom claims should render as custom_claim blocks on the aws gateway resource"
+  }
+
+  assert {
+    condition     = aws_bedrockagentcore_gateway.gateway_http["agents-gateway"].policy_engine_configuration[0].arn == "arn:aws:bedrock-agentcore:us-east-1:123456789012:policy-engine/shared_engine-0123456789" && aws_bedrockagentcore_gateway.gateway_http["agents-gateway"].policy_engine_configuration[0].mode == "LOG_ONLY"
+    error_message = "Policy engines attach to NONE gateways through the policy_engine_configuration block"
+  }
+
+  assert {
+    condition     = aws_bedrockagentcore_gateway.gateway_http["agents-gateway"].interceptor_configuration[0].input_configuration[0].pass_request_headers == false
+    error_message = "Interceptors on NONE gateways should default pass_request_headers to false"
+  }
+
+  assert {
+    condition     = aws_bedrockagentcore_gateway_target.gateway_target["agent"].gateway_identifier == aws_bedrockagentcore_gateway.gateway_http["agents-gateway"].gateway_id && output.gateway_arns["agents-gateway"] == aws_bedrockagentcore_gateway.gateway_http["agents-gateway"].gateway_arn
+    error_message = "Targets and outputs should resolve NONE gateways through the merged gateway maps"
   }
 
   # runtime target by name
@@ -478,6 +514,18 @@ run "mcp_gateway_and_server_target" {
   variables {
     gateways = {
       tools-gateway = {
+        authorizer_type = "CUSTOM_JWT"
+        authorizer_configuration = {
+          custom_jwt_authorizer = {
+            discovery_url            = "https://idp.example.com/.well-known/openid-configuration"
+            allowed_scopes           = ["tools/read"]
+            advertised_scope_mapping = { "tools/read" = "read" }
+          }
+        }
+        waf_configuration = {
+          failure_mode = "FAIL_OPEN"
+          web_acl_arn  = "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/tools/00000000-0000-0000-0000-000000000000"
+        }
         protocol_configuration = {
           mcp = {
             supported_versions         = ["2025-11-25"]
@@ -530,6 +578,21 @@ run "mcp_gateway_and_server_target" {
   assert {
     condition     = awscc_bedrockagentcore_gateway.gateway["tools-gateway"].interceptor_configurations[0].input_configuration.payload_filter.exclude[0].field == "RESPONSE_BODY"
     error_message = "exclude_fields should render as a payload_filter"
+  }
+
+  assert {
+    condition     = awscc_bedrockagentcore_gateway.gateway["tools-gateway"].authorizer_configuration.custom_jwt_authorizer.advertised_scope_mapping["tools/read"] == "read"
+    error_message = "advertised_scope_mapping should pass through on MCP gateways"
+  }
+
+  assert {
+    condition     = awscc_bedrockagentcore_gateway.gateway["tools-gateway"].waf_configuration.failure_mode == "FAIL_OPEN"
+    error_message = "waf_configuration.failure_mode should pass through"
+  }
+
+  assert {
+    condition     = aws_wafv2_web_acl_association.gateway["tools-gateway"].resource_arn == awscc_bedrockagentcore_gateway.gateway["tools-gateway"].gateway_arn && endswith(aws_wafv2_web_acl_association.gateway["tools-gateway"].web_acl_arn, "/00000000-0000-0000-0000-000000000000")
+    error_message = "web_acl_arn should be associated with the gateway ARN"
   }
 
   assert {

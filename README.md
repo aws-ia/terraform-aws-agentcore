@@ -58,7 +58,7 @@ Terraform module for creating and managing Amazon Bedrock AgentCore resources. A
 - **Policy engine, policy and configuration bundle names use underscores, not hyphens** (`my_policy_engine`); gateway, gateway target and registry names use hyphens.
 - Policy statements and configuration bundle component keys can reference resources created in the same module call with the `{{gateway:<name>}}`, `{{target:<name>}}` and `{{runtime:<name>}}` placeholders, which the module resolves at apply time. Gateway tools are named `<target name>___<tool>`, and gateway target names are prefixed with `project_prefix`.
 - AWS Agent Registry is used through its own `agent-registry` namespace (`awscc_agentregistry_*` resources and `agent-registry:*` IAM actions). The public-preview `bedrock-agentcore` registry namespace shuts down on October 30, 2026.
-- Gateway targets come in two families. `LAMBDA` and `MCP_SERVER` targets need a gateway with `protocol_type = "MCP"` (the default); `AGENTCORE_RUNTIME` and `HTTP_PASSTHROUGH` targets need a gateway created with `protocol_type = "NONE"`, which the module maps to a gateway without a protocol type. HTTP targets are reached by path: `<gateway url host>/<target name>/invocations` for runtimes.
+- Gateway targets come in two families. `LAMBDA` and `MCP_SERVER` targets need a gateway with `protocol_type = "MCP"` (the default, an `awscc_bedrockagentcore_gateway`); `AGENTCORE_RUNTIME` and `HTTP_PASSTHROUGH` targets need a gateway created with `protocol_type = "NONE"`, which the module creates as an `aws_bedrockagentcore_gateway` without a protocol type (the CloudFormation-based resource always ends up with MCP). Such gateways support JWT, policy engines and interceptors, but not `waf_configuration`, `advertised_scope_mapping` or interceptor `exclude_fields`. HTTP targets are reached by path: `<gateway url host>/<target name>/invocations` for runtimes.
 - Inbound JWT authorization is the same `custom_jwt_authorizer` shape on runtimes and gateways (discovery URL plus at least one of allowed audience, clients, scopes or custom claims). The runtime's `request_header_allowlist` may include `Authorization` only when a JWT authorizer is configured.
 
 ## Basic Usage - Create Runtime with Endpoint
@@ -252,10 +252,10 @@ module "agentcore" {
           name      = "AllowOrderLookup"
           statement = <<-EOT
             permit(
-              principal,
+              principal is AgentCore::IamEntity,
               action == AgentCore::Action::"{{target:orders}}___get_order",
               resource == AgentCore::Gateway::"{{gateway:my-gateway}}"
-            );
+            ) when { principal.id like "*:123456789012:*" };
           EOT
         },
         {
@@ -297,7 +297,7 @@ module "agentcore" {
 }
 ```
 
-The module grants the gateway role `bedrock-agentcore:GetPolicyEngine`, `AuthorizeAction`, `PartiallyAuthorizeActions` and `GetWorkloadAccessToken` (temporal policies). Callers of a gateway whose engine holds a temporal policy must send a policy session ID in the `x-amzn-bedrock-agentcore-policy-session-id` header.
+The module grants the gateway role `bedrock-agentcore:GetPolicyEngine`, `AuthorizeAction`, `PartiallyAuthorizeActions` and `GetWorkloadAccessToken` (temporal policies), and waits 60 seconds after the gateway targets before creating policies so their tool names are visible to the validator. Under the default `FAIL_ON_ANY_FINDINGS` validation the Cedar analyzer rejects a `permit` with an unconstrained `principal` as "Overly Permissive", so scope permits (for example on `principal.id`, the caller's IAM ARN, or on token claims). Callers of a gateway whose engine holds a temporal policy must send a policy session ID in the `x-amzn-bedrock-agentcore-policy-session-id` header.
 
 ## Basic Usage - Create Configuration Bundles
 
@@ -428,6 +428,7 @@ No modules.
 
 | Name | Type |
 |------|------|
+| [aws_bedrockagentcore_gateway.gateway_http](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/bedrockagentcore_gateway) | resource |
 | [aws_bedrockagentcore_gateway_target.gateway_target](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/bedrockagentcore_gateway_target) | resource |
 | [aws_bedrockagentcore_workload_identity.workload_identity](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/bedrockagentcore_workload_identity) | resource |
 | [aws_codebuild_project.runtime_code](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/codebuild_project) | resource |
@@ -478,6 +479,7 @@ No modules.
 | [time_sleep.code_interpreter_iam_role_propagation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
 | [time_sleep.codebuild_iam_propagation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
 | [time_sleep.gateway_iam_policy_propagation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
+| [time_sleep.gateway_target_propagation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
 | [time_sleep.iam_role_propagation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
 | [time_sleep.memory_iam_role_propagation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
 | [archive_file.runtime_source](https://registry.terraform.io/providers/hashicorp/archive/latest/docs/data-sources/file) | data source |
@@ -538,12 +540,12 @@ No modules.
 | <a name="output_gateway_arns"></a> [gateway\_arns](#output\_gateway\_arns) | Map of gateway names to their ARNs |
 | <a name="output_gateway_ids"></a> [gateway\_ids](#output\_gateway\_ids) | Map of gateway names to their IDs |
 | <a name="output_gateway_role_arns"></a> [gateway\_role\_arns](#output\_gateway\_role\_arns) | Map of gateway names to their IAM role ARNs |
-| <a name="output_gateway_statuses"></a> [gateway\_statuses](#output\_gateway\_statuses) | Map of gateway names to their statuses |
+| <a name="output_gateway_statuses"></a> [gateway\_statuses](#output\_gateway\_statuses) | Map of MCP gateway names to their statuses (gateways with protocol\_type NONE do not expose a status) |
 | <a name="output_gateway_target_gateway_ids"></a> [gateway\_target\_gateway\_ids](#output\_gateway\_target\_gateway\_ids) | Map of gateway target names to their associated gateway IDs |
 | <a name="output_gateway_target_ids"></a> [gateway\_target\_ids](#output\_gateway\_target\_ids) | Map of gateway target names to their IDs |
 | <a name="output_gateway_target_names"></a> [gateway\_target\_names](#output\_gateway\_target\_names) | Map of gateway target names to their resource names |
 | <a name="output_gateway_urls"></a> [gateway\_urls](#output\_gateway\_urls) | Map of gateway names to their URLs |
-| <a name="output_gateway_web_acl_arns"></a> [gateway\_web\_acl\_arns](#output\_gateway\_web\_acl\_arns) | Map of gateway names to the ARN of the AWS WAF web ACL associated with them (empty string when none) |
+| <a name="output_gateway_web_acl_arns"></a> [gateway\_web\_acl\_arns](#output\_gateway\_web\_acl\_arns) | Map of MCP gateway names to the ARN of the AWS WAF web ACL associated with them (empty string when none) |
 | <a name="output_gateway_workload_identity_arns"></a> [gateway\_workload\_identity\_arns](#output\_gateway\_workload\_identity\_arns) | Map of gateway names to the ARN of the workload identity AgentCore created for the gateway |
 | <a name="output_memory_arns"></a> [memory\_arns](#output\_memory\_arns) | Map of memory names to their ARNs |
 | <a name="output_memory_ids"></a> [memory\_ids](#output\_memory\_ids) | Map of memory names to their IDs |

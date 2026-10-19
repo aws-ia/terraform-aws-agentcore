@@ -44,6 +44,19 @@ resource "awscc_bedrockagentcore_policy" "policy" {
   # references, and the gateway must already be attached to the engine.
   depends_on = [
     awscc_bedrockagentcore_gateway.gateway,
-    aws_bedrockagentcore_gateway_target.gateway_target
+    aws_bedrockagentcore_gateway.gateway_http,
+    aws_bedrockagentcore_gateway_target.gateway_target,
+    time_sleep.gateway_target_propagation
   ]
+}
+
+# The tool schema of a freshly created gateway target takes a moment to reach the
+# policy validator; creating a policy immediately after its target fails with
+# "Policy references an action that does not exist on the target gateway".
+resource "time_sleep" "gateway_target_propagation" {
+  count = length(local.policies) > 0 ? 1 : 0
+
+  create_duration = "60s"
+
+  depends_on = [aws_bedrockagentcore_gateway_target.gateway_target]
 }

@@ -461,6 +461,18 @@ variable "gateways" {
   validation {
     condition = alltrue([
       for name, config in var.gateways :
+      config.protocol_type != "NONE" || (
+        config.waf_configuration == null &&
+        try(config.authorizer_configuration.custom_jwt_authorizer.advertised_scope_mapping, null) == null &&
+        alltrue([for i in config.interceptor_configurations : i.input_configuration == null || length(i.input_configuration.exclude_fields) == 0])
+      )
+    ])
+    error_message = "Gateways with protocol_type NONE are created with the aws provider resource, which does not support waf_configuration, advertised_scope_mapping or interceptor exclude_fields yet; leave those unset or use an MCP gateway."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateways :
       config.authorizer_type != "CUSTOM_JWT" || config.authorizer_configuration != null
     ])
     error_message = "authorizer_configuration.custom_jwt_authorizer is required when authorizer_type is CUSTOM_JWT."

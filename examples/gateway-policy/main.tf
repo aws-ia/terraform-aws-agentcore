@@ -59,6 +59,9 @@ resource "aws_lambda_function" "orders" {
   }
 }
 
+# Used to scope the lookup policy to IAM callers from this account
+data "aws_caller_identity" "current" {}
+
 module "terraform-aws-agentcore" {
   source = "../.."
   # source = "aws-ia/agentcore/aws"
@@ -75,14 +78,17 @@ module "terraform-aws-agentcore" {
       description = "Authorizes tool calls on the orders gateway"
       policies = [
         {
+          # An unconstrained principal is reported as "Overly Permissive" by the Cedar
+          # analyzer and rejected under FAIL_ON_ANY_FINDINGS, so scope the permit to IAM
+          # callers of this account (IAM principals carry their ARN in the id attribute).
           name        = "AllowOrderLookup"
-          description = "Any authenticated caller may look up an order"
+          description = "IAM callers from this account may look up an order"
           statement   = <<-EOT
             permit(
-              principal,
+              principal is AgentCore::IamEntity,
               action == AgentCore::Action::"{{target:orders-lookup}}___get_order",
               resource == AgentCore::Gateway::"{{gateway:orders-gateway}}"
-            );
+            ) when { principal.id like "*:${data.aws_caller_identity.current.account_id}:*" };
           EOT
         },
         {

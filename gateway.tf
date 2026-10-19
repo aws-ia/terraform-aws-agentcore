@@ -4,14 +4,21 @@
 
 # ─── Gateways ───
 
+# MCP gateways (protocol_type = "MCP", the default). Gateways that front HTTP targets
+# (protocol_type = "NONE") are created below with the aws provider resource, because
+# the CloudFormation-based awscc resource always ends up with the MCP protocol type.
 resource "awscc_bedrockagentcore_gateway" "gateway" {
-  for_each = var.gateways
+  for_each = {
+    for name, config in var.gateways :
+    name => config
+    if config.protocol_type != "NONE"
+  }
 
   name            = each.key
   description     = each.value.description
   role_arn        = each.value.role_arn != null ? each.value.role_arn : aws_iam_role.gateway[each.key].arn
   authorizer_type = each.value.authorizer_type
-  protocol_type   = each.value.protocol_type == "NONE" ? null : each.value.protocol_type # HTTP targets need a gateway without a protocol type
+  protocol_type   = each.value.protocol_type
   exception_level = each.value.exception_level
   kms_key_arn     = each.value.kms_key_arn
 
@@ -65,6 +72,77 @@ resource "awscc_bedrockagentcore_gateway" "gateway" {
   depends_on = [time_sleep.gateway_iam_policy_propagation]
 }
 
+# ─── Gateways without a protocol type (HTTP targets: AgentCore Runtime, passthrough) ───
+
+resource "aws_bedrockagentcore_gateway" "gateway_http" {
+  for_each = {
+    for name, config in var.gateways :
+    name => config
+    if config.protocol_type == "NONE"
+  }
+
+  name            = each.key
+  description     = each.value.description
+  role_arn        = each.value.role_arn != null ? each.value.role_arn : aws_iam_role.gateway[each.key].arn
+  authorizer_type = each.value.authorizer_type
+  exception_level = each.value.exception_level
+  kms_key_arn     = each.value.kms_key_arn
+
+  dynamic "authorizer_configuration" {
+    for_each = each.value.authorizer_type == "CUSTOM_JWT" && each.value.authorizer_configuration != null ? [each.value.authorizer_configuration.custom_jwt_authorizer] : []
+    content {
+      custom_jwt_authorizer {
+        discovery_url    = authorizer_configuration.value.discovery_url
+        allowed_audience = authorizer_configuration.value.allowed_audience
+        allowed_clients  = authorizer_configuration.value.allowed_clients
+        allowed_scopes   = authorizer_configuration.value.allowed_scopes
+
+        dynamic "custom_claim" {
+          for_each = authorizer_configuration.value.custom_claims
+          content {
+            inbound_token_claim_name       = custom_claim.value.inbound_token_claim_name
+            inbound_token_claim_value_type = custom_claim.value.inbound_token_claim_value_type
+            authorizing_claim_match_value {
+              claim_match_operator = custom_claim.value.claim_match_operator
+              claim_match_value {
+                match_value_string      = custom_claim.value.match_value_string
+                match_value_string_list = custom_claim.value.match_value_string_list
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  dynamic "interceptor_configuration" {
+    for_each = each.value.interceptor_configurations
+    content {
+      interception_points = interceptor_configuration.value.interception_points
+      interceptor {
+        lambda {
+          arn = interceptor_configuration.value.interceptor.lambda.arn
+        }
+      }
+      input_configuration {
+        pass_request_headers = interceptor_configuration.value.input_configuration != null ? interceptor_configuration.value.input_configuration.pass_request_headers : false
+      }
+    }
+  }
+
+  dynamic "policy_engine_configuration" {
+    for_each = each.value.policy_engine_configuration != null ? [1] : []
+    content {
+      arn  = local.gateway_policy_engine_arns[each.key]
+      mode = each.value.policy_engine_configuration.mode
+    }
+  }
+
+  tags = merge(local.merged_tags, each.value.tags)
+
+  depends_on = [time_sleep.gateway_iam_policy_propagation]
+}
+
 # ─── AWS WAF web ACL association ───
 # One regional web ACL per gateway. The caller needs wafv2:AssociateWebACL and
 # bedrock-agentcore:GatewayAssociateWebACL (and the Disassociate counterparts).
@@ -76,7 +154,7 @@ resource "aws_wafv2_web_acl_association" "gateway" {
     if config.waf_configuration != null && config.waf_configuration.web_acl_arn != null
   }
 
-  resource_arn = awscc_bedrockagentcore_gateway.gateway[each.key].gateway_arn
+  resource_arn = local.gateway_arns[each.key]
   web_acl_arn  = each.value.waf_configuration.web_acl_arn
 }
 
@@ -86,11 +164,12 @@ resource "aws_bedrockagentcore_gateway_target" "gateway_target" {
   for_each = var.gateway_targets
 
   name               = "${var.project_prefix}-${each.key}"
-  gateway_identifier = awscc_bedrockagentcore_gateway.gateway[each.value.gateway_name].gateway_identifier
+  gateway_identifier = local.gateway_identifiers[each.value.gateway_name]
   description        = each.value.description
 
   depends_on = [
     awscc_bedrockagentcore_gateway.gateway,
+    aws_bedrockagentcore_gateway.gateway_http,
     aws_iam_role_policy.gateway_role_policy,
     time_sleep.gateway_iam_policy_propagation
   ]

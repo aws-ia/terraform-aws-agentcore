@@ -57,7 +57,7 @@ locals {
 
 locals {
   placeholder_values = merge(
-    { for k, v in awscc_bedrockagentcore_gateway.gateway : "gateway:${k}" => v.gateway_arn },
+    { for k, v in local.gateway_arns : "gateway:${k}" => v },
     { for k, v in aws_bedrockagentcore_gateway_target.gateway_target : "target:${k}" => v.name },
     { for k, v in awscc_bedrockagentcore_runtime.runtime_code : "runtime:${k}" => v.agent_runtime_arn },
     { for k, v in awscc_bedrockagentcore_runtime.runtime_container : "runtime:${k}" => v.agent_runtime_arn }
@@ -222,4 +222,29 @@ locals {
     )
     if config.type == "AGENTCORE_RUNTIME" && config.agentcore_runtime_config != null
   }
+}
+
+# =============================================================================
+# GATEWAYS (both resource types)
+# =============================================================================
+# MCP gateways are awscc_bedrockagentcore_gateway, gateways without a protocol type
+# (HTTP targets) are aws_bedrockagentcore_gateway. These maps present them uniformly.
+
+locals {
+  gateway_arns = merge(
+    { for k, v in awscc_bedrockagentcore_gateway.gateway : k => v.gateway_arn },
+    { for k, v in aws_bedrockagentcore_gateway.gateway_http : k => v.gateway_arn }
+  )
+  gateway_identifiers = merge(
+    { for k, v in awscc_bedrockagentcore_gateway.gateway : k => v.gateway_identifier },
+    { for k, v in aws_bedrockagentcore_gateway.gateway_http : k => v.gateway_id }
+  )
+  gateway_urls = merge(
+    { for k, v in awscc_bedrockagentcore_gateway.gateway : k => v.gateway_url },
+    { for k, v in aws_bedrockagentcore_gateway.gateway_http : k => v.gateway_url }
+  )
+  gateway_workload_identity_arns = merge(
+    { for k, v in awscc_bedrockagentcore_gateway.gateway : k => v.workload_identity_details.workload_identity_arn },
+    { for k, v in aws_bedrockagentcore_gateway.gateway_http : k => try(v.workload_identity_details[0].workload_identity_arn, null) }
+  )
 }

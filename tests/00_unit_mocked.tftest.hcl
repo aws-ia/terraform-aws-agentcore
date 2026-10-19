@@ -38,6 +38,16 @@ mock_provider "aws" {
       arn = "arn:aws:lambda:us-east-1:123456789012:function:mock-function"
     }
   }
+  mock_resource "aws_bedrockagentcore_gateway" {
+    defaults = {
+      gateway_arn = "arn:aws:bedrock-agentcore:us-east-1:123456789012:gateway/mock-http-gateway-abcdefghij"
+      gateway_id  = "mock-http-gateway-abcdefghij"
+      gateway_url = "https://mock-http-gateway-abcdefghij.gateway.bedrock-agentcore.us-east-1.amazonaws.com"
+      workload_identity_details = [{
+        workload_identity_arn = "arn:aws:bedrock-agentcore:us-east-1:123456789012:workload-identity-directory/default/workload-identity/mock-http-gateway-abcdefghij"
+      }]
+    }
+  }
   mock_resource "aws_bedrockagentcore_workload_identity" {
     defaults = {
       workload_identity_arn = "arn:aws:bedrock-agentcore:us-east-1:123456789012:workload-identity-directory/default/workload-identity/mock-identity"

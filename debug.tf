@@ -36,9 +36,9 @@ locals {
 
   debug_gateways = {
     for name, config in var.gateways : name => {
-      id  = awscc_bedrockagentcore_gateway.gateway[name].id
-      arn = awscc_bedrockagentcore_gateway.gateway[name].gateway_arn
-      url = awscc_bedrockagentcore_gateway.gateway[name].gateway_url
+      id  = local.gateway_identifiers[name]
+      arn = local.gateway_arns[name]
+      url = local.gateway_urls[name]
     }
   }
 

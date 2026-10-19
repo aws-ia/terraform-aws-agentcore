@@ -38,6 +38,16 @@ mock_provider "aws" {
       arn = "arn:aws:lambda:us-east-1:123456789012:function:mock-function"
     }
   }
+  mock_resource "aws_bedrockagentcore_gateway" {
+    defaults = {
+      gateway_arn = "arn:aws:bedrock-agentcore:us-east-1:123456789012:gateway/mock-http-gateway-abcdefghij"
+      gateway_id  = "mock-http-gateway-abcdefghij"
+      gateway_url = "https://mock-http-gateway-abcdefghij.gateway.bedrock-agentcore.us-east-1.amazonaws.com"
+      workload_identity_details = [{
+        workload_identity_arn = "arn:aws:bedrock-agentcore:us-east-1:123456789012:workload-identity-directory/default/workload-identity/mock-http-gateway-abcdefghij"
+      }]
+    }
+  }
   mock_resource "aws_bedrockagentcore_workload_identity" {
     defaults = {
       workload_identity_arn = "arn:aws:bedrock-agentcore:us-east-1:123456789012:workload-identity-directory/default/workload-identity/mock-identity"
@@ -188,6 +198,26 @@ run "gateway_rejects_protocol_configuration_on_none" {
 
   variables {
     gateways = { g = { protocol_type = "NONE", protocol_configuration = { mcp = { instructions = "x" } } } }
+  }
+
+  expect_failures = [var.gateways]
+}
+
+run "gateway_rejects_waf_on_none_gateway" {
+  command = plan
+
+  variables {
+    gateways = { g = { protocol_type = "NONE", waf_configuration = { failure_mode = "FAIL_OPEN" } } }
+  }
+
+  expect_failures = [var.gateways]
+}
+
+run "gateway_rejects_exclude_fields_on_none_gateway" {
+  command = plan
+
+  variables {
+    gateways = { g = { protocol_type = "NONE", interceptor_configurations = [{ interception_points = ["REQUEST"], interceptor = { lambda = { arn = "arn:aws:lambda:us-east-1:123456789012:function:i" } }, input_configuration = { exclude_fields = ["RESPONSE_BODY"] } }] } }
   }
 
   expect_failures = [var.gateways]
