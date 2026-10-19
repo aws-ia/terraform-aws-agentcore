@@ -1044,3 +1044,41 @@ Common test failures:
 6. Update examples
 7. Add tests
 8. Update documentation
+
+## Policy, Configuration Bundles and Registry: Ordering and Placeholders
+
+### Why placeholders exist
+
+Cedar and Dogwood statements name the gateway they protect by ARN (`resource == AgentCore::Gateway::"arn:..."`) and tools by `<target name>___<tool>`. Configuration bundle components are keyed by the ARN of the runtime they configure. Inside one module call those values do not exist yet, so a user cannot write them literally. `locals.tf` resolves these placeholders before the value is sent to AWS:
+
+| Placeholder | Resolves to |
+|-------------|-------------|
+| `{{gateway:<name>}}` | `awscc_bedrockagentcore_gateway.gateway[<name>].gateway_arn` |
+| `{{target:<name>}}` | `aws_bedrockagentcore_gateway_target.gateway_target[<name>].name` (which includes `project_prefix`) |
+| `{{runtime:<name>}}` | the runtime ARN (CODE or CONTAINER) |
+
+The resolution splits the text on `{{`, looks each candidate key up in `local.placeholder_values`, and restores anything it does not recognize, so unrelated `{{` sequences pass through unchanged. Unknown keys stay unknown until apply, which is fine for the policy and bundle resources.
+
+### Creation order for Policy in AgentCore
+
+```
+policy engine
+  ↓ (gateway.policy_engine_configuration.arn)
+gateway IAM role + policy (GetPolicyEngine, AuthorizeAction, PartiallyAuthorizeActions, GetWorkloadAccessToken)
+  ↓ (time_sleep.gateway_iam_policy_propagation; the gateway now depends on it)
+gateway (attached to the engine in ENFORCE or LOG_ONLY mode)
+  ↓
+gateway targets (define the tools, and therefore the Cedar action names)
+  ↓ (explicit depends_on)
+policies (validated by the service against the gateway's tools)
+```
+
+Policies depend on the gateway targets explicitly because `validation_mode = FAIL_ON_ANY_FINDINGS` (the default) makes the service check every action named in a statement against the tools of the gateways attached to the engine. A Dogwood (temporal) policy in an engine makes the gateway require the `x-amzn-bedrock-agentcore-policy-session-id` header on every request.
+
+### Configuration bundles are not attached to the runtime
+
+There is no runtime attribute for a bundle. The bundle reference travels with each request as W3C baggage (`aws.agentcore.configbundle_arn`, `aws.agentcore.configbundle_version`), either set by the caller or injected by a gateway rule or A/B test, and the SDK resolves it with `GetConfigurationBundleVersion`. That is why the runtime role gets `bedrock-agentcore:GetConfigurationBundle*` only when the module call defines bundles, and why the module outputs both the bundle ARN and the current version ID.
+
+### Agent Registry namespaces
+
+AWS Agent Registry launched under the `agent-registry` namespace on August 6, 2026. The module uses `awscc_agentregistry_registry` and `awscc_agentregistry_registry_record` and grants `agent-registry:*` actions; the deprecated `aws_bedrockagentcore_registry` resource and the `bedrock-agentcore:*Registry*` actions stop working on October 30, 2026. Records are normally written at run time by a publishing pipeline with the publisher IAM policy the module creates.
