@@ -23,7 +23,7 @@ This example shows the gateway target types beyond Lambda tools, together with J
 |--------|-------------------------|---------------------|----------------------|
 | `LAMBDA` | `MCP` | `lambda_config` | `GATEWAY_IAM_ROLE` |
 | `MCP_SERVER` | `MCP` | `mcp_server_config` (optional `tool_schema`, `listing_mode`, `resource_priority`) | none, `API_KEY` or `OAUTH` |
-| `AGENTCORE_RUNTIME` | `NONE` | `agentcore_runtime_config` (`runtime_name` or `runtime_arn`, `qualifier`, optional `schema`) | `GATEWAY_IAM_ROLE` (signed for `bedrock-agentcore`), `CALLER_IAM_CREDENTIALS`, `OAUTH` or `JWT_PASSTHROUGH` |
+| `AGENTCORE_RUNTIME` | `NONE` | `agentcore_runtime_config` (`runtime_name` or `runtime_arn`, `qualifier`, optional `schema`) | none (the gateway role, implicitly), `CALLER_IAM_CREDENTIALS`, `OAUTH` or `JWT_PASSTHROUGH` |
 | `HTTP_PASSTHROUGH` | `NONE` | `passthrough_config` (`endpoint`, `protocol_type` MCP/A2A/INFERENCE/CUSTOM, optional `schema`, static query parameters, stickiness) | `GATEWAY_IAM_ROLE` with `gateway_iam_role_config.service`, `API_KEY`, `OAUTH` or `JWT_PASSTHROUGH` |
 
 HTTP targets are addressed by path: `https://<gateway url host>/<target name>/invocations` for a runtime target and `https://<gateway url host>/<target name>/<path>` for passthrough targets. Target names are prefixed with `project_prefix` (see the `gateway_target_names` output).

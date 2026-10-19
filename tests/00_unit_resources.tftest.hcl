@@ -326,9 +326,8 @@ run "http_targets_and_runtime_attributes" {
 
     gateway_targets = {
       agent = {
-        gateway_name             = "agents-gateway"
-        type                     = "AGENTCORE_RUNTIME"
-        credential_provider_type = "GATEWAY_IAM_ROLE"
+        gateway_name = "agents-gateway"
+        type         = "AGENTCORE_RUNTIME"
         agentcore_runtime_config = {
           runtime_name = "support_agent"
         }
@@ -441,8 +440,8 @@ run "http_targets_and_runtime_attributes" {
   }
 
   assert {
-    condition     = aws_bedrockagentcore_gateway_target.gateway_target["agent"].credential_provider_configuration[0].gateway_iam_role[0].service == "bedrock-agentcore"
-    error_message = "Runtime targets signed with the gateway role should use the bedrock-agentcore service"
+    condition     = length(aws_bedrockagentcore_gateway_target.gateway_target["agent"].credential_provider_configuration) == 0
+    error_message = "A runtime target without a credential type must not render a credential block (the gateway role is implicit)"
   }
 
   assert {

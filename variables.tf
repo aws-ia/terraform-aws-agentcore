@@ -539,7 +539,8 @@ variable "gateway_targets" {
     description              = optional(string)
     credential_provider_type = optional(string) # "GATEWAY_IAM_ROLE", "API_KEY", "OAUTH", "JWT_PASSTHROUGH" or "CALLER_IAM_CREDENTIALS"
 
-    # GATEWAY_IAM_ROLE: SigV4 signing of upstream requests (service is set to bedrock-agentcore for AGENTCORE_RUNTIME targets)
+    # GATEWAY_IAM_ROLE: SigV4 signing of upstream requests with the gateway role (not for AGENTCORE_RUNTIME
+    # targets, which use the gateway role implicitly); service/region only for SigV4-protected endpoints
     gateway_iam_role_config = optional(object({
       service = optional(string)
       region  = optional(string)
@@ -769,6 +770,14 @@ variable "gateway_targets" {
       config.credential_provider_type != "CALLER_IAM_CREDENTIALS" || config.caller_iam_config != null
     ])
     error_message = "caller_iam_config (service, optional region) is required when credential_provider_type is CALLER_IAM_CREDENTIALS."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, config in var.gateway_targets :
+      !(config.type == "AGENTCORE_RUNTIME" && config.credential_provider_type == "GATEWAY_IAM_ROLE")
+    ])
+    error_message = "AGENTCORE_RUNTIME targets use the gateway role implicitly and the service rejects an IAM credential provider for them: leave credential_provider_type unset, or use CALLER_IAM_CREDENTIALS, OAUTH or JWT_PASSTHROUGH."
   }
 
   validation {

@@ -178,11 +178,12 @@ resource "aws_bedrockagentcore_gateway_target" "gateway_target" {
     for_each = each.value.credential_provider_type != null ? [1] : []
 
     content {
-      # SigV4 with the gateway role; AgentCore Runtime targets are signed for the bedrock-agentcore service
+      # SigV4 with the gateway role (service/region only for SigV4-protected passthrough endpoints).
+      # AgentCore Runtime targets use the gateway role implicitly and reject this block.
       dynamic "gateway_iam_role" {
         for_each = each.value.credential_provider_type == "GATEWAY_IAM_ROLE" ? [1] : []
         content {
-          service = try(each.value.gateway_iam_role_config.service, null) != null ? each.value.gateway_iam_role_config.service : (each.value.type == "AGENTCORE_RUNTIME" ? "bedrock-agentcore" : null)
+          service = try(each.value.gateway_iam_role_config.service, null)
           region  = try(each.value.gateway_iam_role_config.region, null)
         }
       }

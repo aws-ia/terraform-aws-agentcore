@@ -92,9 +92,14 @@ module "terraform-aws-agentcore" {
           EOT
         },
         {
+          # The analyzer reports a forbid on an action that no plain Cedar permit allows as
+          # "Overly Restrictive" (the temporal permit below does not count), which is normal
+          # for an observation policy: IGNORE_ALL_FINDINGS keeps the analyzer out of the way
+          # while the policy collects data in LOG_ONLY mode.
           name             = "FlagLargeRefunds"
           description      = "Refunds above 500 are denied once promoted to ACTIVE; LOG_ONLY observes first"
           enforcement_mode = "LOG_ONLY"
+          validation_mode  = "IGNORE_ALL_FINDINGS"
           statement        = <<-EOT
             forbid(
               principal,
