@@ -10,7 +10,7 @@ module "terraform-aws-agentcore" {
       source_type           = "CONTAINER"
       container_source_path = "./src"
       description           = "Basic CONTAINER runtime with STRANDS framework"
-      
+
       environment_variables = {
         LOG_LEVEL = "INFO"
       }

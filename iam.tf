@@ -36,9 +36,9 @@ resource "aws_iam_role" "runtime" {
     if config.execution_role_arn == null
   }
 
-  name                 = "${var.project_prefix}-${each.key}-runtime"
-  assume_role_policy   = data.aws_iam_policy_document.runtime_assume_role.json
-  tags                 = local.merged_tags
+  name               = "${var.project_prefix}-${each.key}-runtime"
+  assume_role_policy = data.aws_iam_policy_document.runtime_assume_role.json
+  tags               = local.merged_tags
 }
 
 # Wait for IAM role propagation
@@ -86,9 +86,9 @@ data "aws_iam_policy_document" "runtime_policy" {
   }
 
   statement {
-    sid    = "AllowCloudWatchMetrics"
-    effect = "Allow"
-    actions = ["cloudwatch:PutMetricData"]
+    sid       = "AllowCloudWatchMetrics"
+    effect    = "Allow"
+    actions   = ["cloudwatch:PutMetricData"]
     resources = ["*"]
     condition {
       test     = "StringEquals"
@@ -115,6 +115,37 @@ data "aws_iam_policy_document" "runtime_policy" {
       "bedrock-agentcore:RefreshWorkloadIdentityToken"
     ]
     resources = ["*"]
+  }
+
+  # Workload access tokens for the runtime's own workload identity
+  # (AgentCore Identity creates it as <runtime name>-<id> in the default directory)
+  statement {
+    sid    = "AllowWorkloadAccessToken"
+    effect = "Allow"
+    actions = [
+      "bedrock-agentcore:GetWorkloadAccessToken",
+      "bedrock-agentcore:GetWorkloadAccessTokenForJWT",
+      "bedrock-agentcore:GetWorkloadAccessTokenForUserId"
+    ]
+    resources = [
+      "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
+      "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${each.key}-*"
+    ]
+  }
+
+  # Configuration bundles: the AgentCore SDK resolves the bundle version named in
+  # the request baggage through the control plane
+  dynamic "statement" {
+    for_each = length(var.configuration_bundles) > 0 ? [1] : []
+    content {
+      sid    = "AllowConfigurationBundleRead"
+      effect = "Allow"
+      actions = [
+        "bedrock-agentcore:GetConfigurationBundle",
+        "bedrock-agentcore:GetConfigurationBundleVersion"
+      ]
+      resources = ["arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:configuration-bundle/*"]
+    }
   }
 
   # CODE: S3 read permissions
@@ -231,7 +262,7 @@ data "aws_iam_policy_document" "codebuild_container_policy" {
       "logs:CreateLogStream",
       "logs:PutLogEvents"
     ]
-    resources = ["arn:aws:logs:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:log-group:/aws/codebuild/${var.project_prefix}-${each.key}-container*"]
+    resources = ["arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/codebuild/${var.project_prefix}-${each.key}-container*"]
   }
 
   statement {
@@ -281,7 +312,7 @@ data "aws_iam_policy_document" "codebuild_code_policy" {
       "logs:CreateLogStream",
       "logs:PutLogEvents"
     ]
-    resources = ["arn:aws:logs:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:log-group:/aws/codebuild/${var.project_prefix}-${each.key}-code*"]
+    resources = ["arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/codebuild/${var.project_prefix}-${each.key}-code*"]
   }
 
   statement {
@@ -371,13 +402,75 @@ data "aws_iam_policy_document" "gateway_policy" {
   dynamic "statement" {
     for_each = length([for k, v in var.gateway_targets : v if v.gateway_name == each.key && v.type == "LAMBDA"]) > 0 ? [1] : []
     content {
-      sid       = "AllowLambdaInvocation"
-      effect    = "Allow"
-      actions   = ["lambda:InvokeFunction"]
+      sid     = "AllowLambdaInvocation"
+      effect  = "Allow"
+      actions = ["lambda:InvokeFunction"]
       resources = [
         for k, v in var.gateway_targets :
         v.lambda_config.lambda_arn
         if v.gateway_name == each.key && v.type == "LAMBDA"
+      ]
+    }
+  }
+
+  # Allow invoking AgentCore Runtime targets (SigV4 with the gateway role). Module-managed
+  # runtimes are matched by name so the gateway does not have to wait for the runtime build.
+  dynamic "statement" {
+    for_each = length([for k, v in var.gateway_targets : v if v.gateway_name == each.key && v.type == "AGENTCORE_RUNTIME" && v.agentcore_runtime_config != null]) > 0 ? [1] : []
+    content {
+      sid     = "AllowAgentRuntimeInvocation"
+      effect  = "Allow"
+      actions = ["bedrock-agentcore:InvokeAgentRuntime"]
+      resources = flatten([
+        for k, v in var.gateway_targets : (
+          v.agentcore_runtime_config.runtime_arn != null
+          ? [v.agentcore_runtime_config.runtime_arn, "${v.agentcore_runtime_config.runtime_arn}/runtime-endpoint/*"]
+          : ["arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:runtime/${v.agentcore_runtime_config.runtime_name}-*"]
+        )
+        if v.gateway_name == each.key && v.type == "AGENTCORE_RUNTIME" && v.agentcore_runtime_config != null
+      ])
+    }
+  }
+
+  # Policy engine: read the engine configuration and evaluate policies
+  # (required before a policy engine can be attached to the gateway)
+  dynamic "statement" {
+    for_each = each.value.policy_engine_configuration != null ? [1] : []
+    content {
+      sid       = "AllowPolicyEngineConfiguration"
+      effect    = "Allow"
+      actions   = ["bedrock-agentcore:GetPolicyEngine"]
+      resources = [local.gateway_policy_engine_arns[each.key]]
+    }
+  }
+
+  dynamic "statement" {
+    for_each = each.value.policy_engine_configuration != null ? [1] : []
+    content {
+      sid    = "AllowPolicyEngineAuthorization"
+      effect = "Allow"
+      actions = [
+        "bedrock-agentcore:AuthorizeAction",
+        "bedrock-agentcore:PartiallyAuthorizeActions"
+      ]
+      resources = [
+        local.gateway_policy_engine_arns[each.key],
+        "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:gateway/${each.key}-*"
+      ]
+    }
+  }
+
+  # Temporal (Dogwood) policies: the gateway mints a workload access token to
+  # propagate the caller's policy session
+  dynamic "statement" {
+    for_each = each.value.policy_engine_configuration != null ? [1] : []
+    content {
+      sid     = "AllowPolicySessionWorkloadIdentity"
+      effect  = "Allow"
+      actions = ["bedrock-agentcore:GetWorkloadAccessToken"]
+      resources = [
+        "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
+        "arn:aws:bedrock-agentcore:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/${each.key}-*"
       ]
     }
   }
@@ -554,4 +647,108 @@ data "aws_iam_policy_document" "code_interpreter_policy" {
     ]
     resources = ["arn:aws:logs:*:*:log-group:/aws/bedrock/agentcore/*"]
   }
+}
+
+# =============================================================================
+# AGENT REGISTRY IAM (publishers)
+# =============================================================================
+# A publisher is the pipeline or principal that writes registry records and
+# submits them for approval. The managed policy can be attached to an existing
+# pipeline role; a dedicated role is created when trusted principals or
+# services are given.
+
+data "aws_iam_policy_document" "registry_publisher_policy" {
+  for_each = local.registry_publisher_policies
+
+  statement {
+    sid    = "AllowRegistryRead"
+    effect = "Allow"
+    actions = [
+      "agent-registry:GetRegistry",
+      "agent-registry:ListRegistryRecords"
+    ]
+    resources = [awscc_agentregistry_registry.registry[each.key].registry_arn]
+  }
+
+  statement {
+    sid    = "AllowRegistryRecordPublishing"
+    effect = "Allow"
+    actions = [
+      "agent-registry:CreateRegistryRecord",
+      "agent-registry:GetRegistryRecord",
+      "agent-registry:UpdateRegistryRecord",
+      "agent-registry:DeleteRegistryRecord",
+      "agent-registry:SubmitRegistryRecordForApproval",
+      "agent-registry:TagResource",
+      "agent-registry:UntagResource",
+      "agent-registry:ListTagsForResource"
+    ]
+    resources = [
+      awscc_agentregistry_registry.registry[each.key].registry_arn,
+      "${awscc_agentregistry_registry.registry[each.key].registry_arn}/record/*"
+    ]
+  }
+
+  # Optional curator permission: approve, reject or deprecate records
+  dynamic "statement" {
+    for_each = each.value.publisher.allow_approval ? [1] : []
+    content {
+      sid       = "AllowRegistryRecordApproval"
+      effect    = "Allow"
+      actions   = ["agent-registry:UpdateRegistryRecordStatus"]
+      resources = ["${awscc_agentregistry_registry.registry[each.key].registry_arn}/record/*"]
+    }
+  }
+}
+
+resource "aws_iam_policy" "registry_publisher" {
+  for_each = local.registry_publisher_policies
+
+  name        = "${var.project_prefix}-${each.key}-registry-publisher"
+  description = "Write and submit AWS Agent Registry records in registry ${each.key}"
+  policy      = data.aws_iam_policy_document.registry_publisher_policy[each.key].json
+  tags        = local.merged_tags
+}
+
+data "aws_iam_policy_document" "registry_publisher_assume_role" {
+  for_each = local.registry_publisher_roles
+
+  dynamic "statement" {
+    for_each = length(each.value.publisher.trusted_principal_arns) > 0 ? [1] : []
+    content {
+      actions = ["sts:AssumeRole"]
+      effect  = "Allow"
+      principals {
+        type        = "AWS"
+        identifiers = each.value.publisher.trusted_principal_arns
+      }
+    }
+  }
+
+  dynamic "statement" {
+    for_each = length(each.value.publisher.trusted_services) > 0 ? [1] : []
+    content {
+      actions = ["sts:AssumeRole"]
+      effect  = "Allow"
+      principals {
+        type        = "Service"
+        identifiers = each.value.publisher.trusted_services
+      }
+    }
+  }
+}
+
+resource "aws_iam_role" "registry_publisher" {
+  for_each = local.registry_publisher_roles
+
+  name               = "${var.project_prefix}-${each.key}-registry-publisher"
+  assume_role_policy = data.aws_iam_policy_document.registry_publisher_assume_role[each.key].json
+  tags               = local.merged_tags
+}
+
+resource "aws_iam_role_policy_attachment" "registry_publisher" {
+  for_each = aws_iam_role.registry_publisher
+
+  role       = each.value.name
+  policy_arn = aws_iam_policy.registry_publisher[each.key].arn
 }

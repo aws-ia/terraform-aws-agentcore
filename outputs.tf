@@ -53,7 +53,7 @@ output "s3_bucket_names" {
 
 output "codebuild_project_names" {
   description = "Map of CONTAINER runtime names to their CodeBuild project names"
-  value       = merge(
+  value = merge(
     { for k, v in aws_codebuild_project.runtime_container : k => v.name },
     { for k, v in aws_codebuild_project.runtime_code : k => v.name }
   )
@@ -113,27 +113,32 @@ output "browser_role_arns" {
 
 output "gateway_ids" {
   description = "Map of gateway names to their IDs"
-  value       = { for k, v in awscc_bedrockagentcore_gateway.gateway : k => v.gateway_identifier }
+  value       = local.gateway_identifiers
 }
 
 output "gateway_arns" {
   description = "Map of gateway names to their ARNs"
-  value       = { for k, v in awscc_bedrockagentcore_gateway.gateway : k => v.gateway_arn }
+  value       = local.gateway_arns
 }
 
 output "gateway_urls" {
   description = "Map of gateway names to their URLs"
-  value       = { for k, v in awscc_bedrockagentcore_gateway.gateway : k => v.gateway_url }
+  value       = local.gateway_urls
 }
 
 output "gateway_statuses" {
-  description = "Map of gateway names to their statuses"
+  description = "Map of MCP gateway names to their statuses (gateways with protocol_type NONE do not expose a status)"
   value       = { for k, v in awscc_bedrockagentcore_gateway.gateway : k => v.status }
 }
 
 output "gateway_role_arns" {
   description = "Map of gateway names to their IAM role ARNs"
   value       = { for k, v in aws_iam_role.gateway : k => v.arn }
+}
+
+output "gateway_web_acl_arns" {
+  description = "Map of MCP gateway names to the ARN of the AWS WAF web ACL associated with them (empty string when none)"
+  value       = { for k, v in awscc_bedrockagentcore_gateway.gateway : k => v.web_acl_arn }
 }
 
 output "gateway_target_ids" {
@@ -176,3 +181,117 @@ output "memory_role_arns" {
 }
 
 # =============================================================================
+
+# =============================================================================
+# WORKLOAD IDENTITY OUTPUTS
+# =============================================================================
+
+output "workload_identity_arns" {
+  description = "Map of workload identity names to their ARNs"
+  value       = { for k, v in aws_bedrockagentcore_workload_identity.workload_identity : k => v.workload_identity_arn }
+}
+
+output "runtime_workload_identity_arns" {
+  description = "Map of runtime names to the ARN of the workload identity AgentCore created for the runtime"
+  value = merge(
+    { for k, v in awscc_bedrockagentcore_runtime.runtime_code : k => v.workload_identity_details.workload_identity_arn },
+    { for k, v in awscc_bedrockagentcore_runtime.runtime_container : k => v.workload_identity_details.workload_identity_arn }
+  )
+}
+
+output "gateway_workload_identity_arns" {
+  description = "Map of gateway names to the ARN of the workload identity AgentCore created for the gateway"
+  value       = local.gateway_workload_identity_arns
+}
+
+# =============================================================================
+# AGENT REGISTRY OUTPUTS
+# =============================================================================
+
+output "registry_ids" {
+  description = "Map of registry names to their IDs"
+  value       = { for k, v in awscc_agentregistry_registry.registry : k => v.registry_id }
+}
+
+output "registry_arns" {
+  description = "Map of registry names to their ARNs"
+  value       = { for k, v in awscc_agentregistry_registry.registry : k => v.registry_arn }
+}
+
+output "registry_statuses" {
+  description = "Map of registry names to their statuses"
+  value       = { for k, v in awscc_agentregistry_registry.registry : k => v.status }
+}
+
+output "registry_publisher_policy_arns" {
+  description = "Map of registry names to the ARN of the IAM policy that lets a publisher write and submit records"
+  value       = { for k, v in aws_iam_policy.registry_publisher : k => v.arn }
+}
+
+output "registry_publisher_role_arns" {
+  description = "Map of registry names to the ARN of the publisher IAM role (created when trusted principals or services are given)"
+  value       = { for k, v in aws_iam_role.registry_publisher : k => v.arn }
+}
+
+output "registry_record_ids" {
+  description = "Map of '<registry name>/<record name>' to registry record IDs"
+  value       = { for k, v in awscc_agentregistry_registry_record.record : k => v.record_id }
+}
+
+output "registry_record_arns" {
+  description = "Map of '<registry name>/<record name>' to registry record ARNs"
+  value       = { for k, v in awscc_agentregistry_registry_record.record : k => v.record_arn }
+}
+
+# =============================================================================
+# POLICY OUTPUTS
+# =============================================================================
+
+output "policy_engine_ids" {
+  description = "Map of policy engine names to their IDs"
+  value       = { for k, v in awscc_bedrockagentcore_policy_engine.policy_engine : k => v.policy_engine_id }
+}
+
+output "policy_engine_arns" {
+  description = "Map of policy engine names to their ARNs"
+  value       = { for k, v in awscc_bedrockagentcore_policy_engine.policy_engine : k => v.policy_engine_arn }
+}
+
+output "policy_engine_statuses" {
+  description = "Map of policy engine names to their statuses"
+  value       = { for k, v in awscc_bedrockagentcore_policy_engine.policy_engine : k => v.status }
+}
+
+output "policy_ids" {
+  description = "Map of '<policy engine name>/<policy name>' to policy IDs"
+  value       = { for k, v in awscc_bedrockagentcore_policy.policy : k => v.policy_id }
+}
+
+output "policy_arns" {
+  description = "Map of '<policy engine name>/<policy name>' to policy ARNs"
+  value       = { for k, v in awscc_bedrockagentcore_policy.policy : k => v.policy_arn }
+}
+
+output "policy_statuses" {
+  description = "Map of '<policy engine name>/<policy name>' to policy statuses"
+  value       = { for k, v in awscc_bedrockagentcore_policy.policy : k => v.status }
+}
+
+# =============================================================================
+# CONFIGURATION BUNDLE OUTPUTS
+# =============================================================================
+
+output "configuration_bundle_ids" {
+  description = "Map of configuration bundle names to their IDs"
+  value       = { for k, v in awscc_bedrockagentcore_configuration_bundle.bundle : k => v.bundle_id }
+}
+
+output "configuration_bundle_arns" {
+  description = "Map of configuration bundle names to their ARNs (use with the aws.agentcore.configbundle_arn baggage key)"
+  value       = { for k, v in awscc_bedrockagentcore_configuration_bundle.bundle : k => v.bundle_arn }
+}
+
+output "configuration_bundle_version_ids" {
+  description = "Map of configuration bundle names to their current version IDs (use with the aws.agentcore.configbundle_version baggage key)"
+  value       = { for k, v in awscc_bedrockagentcore_configuration_bundle.bundle : k => v.version_id }
+}

@@ -1044,3 +1044,63 @@ Common test failures:
 6. Update examples
 7. Add tests
 8. Update documentation
+
+## Policy, Configuration Bundles and Registry: Ordering and Placeholders
+
+### Why placeholders exist
+
+Cedar and Dogwood statements name the gateway they protect by ARN (`resource == AgentCore::Gateway::"arn:..."`) and tools by `<target name>___<tool>`. Configuration bundle components are keyed by the ARN of the runtime they configure. Inside one module call those values do not exist yet, so a user cannot write them literally. `locals.tf` resolves these placeholders before the value is sent to AWS:
+
+| Placeholder | Resolves to |
+|-------------|-------------|
+| `{{gateway:<name>}}` | `awscc_bedrockagentcore_gateway.gateway[<name>].gateway_arn` |
+| `{{target:<name>}}` | `aws_bedrockagentcore_gateway_target.gateway_target[<name>].name` (which includes `project_prefix`) |
+| `{{runtime:<name>}}` | the runtime ARN (CODE or CONTAINER) |
+
+The resolution splits the text on `{{`, looks each candidate key up in `local.placeholder_values`, and restores anything it does not recognize, so unrelated `{{` sequences pass through unchanged. Unknown keys stay unknown until apply, which is fine for the policy and bundle resources.
+
+### Creation order for Policy in AgentCore
+
+```
+policy engine
+  ↓ (gateway.policy_engine_configuration.arn)
+gateway IAM role + policy (GetPolicyEngine, AuthorizeAction, PartiallyAuthorizeActions, GetWorkloadAccessToken)
+  ↓ (time_sleep.gateway_iam_policy_propagation; the gateway now depends on it)
+gateway (attached to the engine in ENFORCE or LOG_ONLY mode)
+  ↓
+gateway targets (define the tools, and therefore the Cedar action names)
+  ↓ (explicit depends_on)
+policies (validated by the service against the gateway's tools)
+```
+
+Policies depend on the gateway targets explicitly, plus a 60-second `time_sleep.gateway_target_propagation`, because `validation_mode = FAIL_ON_ANY_FINDINGS` (the default) makes the service check every action named in a statement against the tools of the gateways attached to the engine, and a target's tools take a moment to reach the validator: in a real apply a policy created right after its target failed with "Policy references an action that does not exist on the target gateway" while a sibling policy on an earlier target passed. The same validation reports a `permit` with an unconstrained `principal` as "Overly Permissive" and a `forbid` on an action without a plain Cedar permit as "Overly Restrictive" (temporal permits do not count); scope permits with `principal is AgentCore::IamEntity` plus a condition on `principal.id` (the caller's IAM ARN), or on token claims for `AgentCore::OAuthUser`, and set `validation_mode = "IGNORE_ALL_FINDINGS"` on observation-only forbids. A Dogwood (temporal) policy in an engine makes the gateway require the `x-amzn-bedrock-agentcore-policy-session-id` header on every request.
+
+### Configuration bundles are not attached to the runtime
+
+There is no runtime attribute for a bundle. The bundle reference travels with each request as W3C baggage (`aws.agentcore.configbundle_arn`, `aws.agentcore.configbundle_version`), either set by the caller or injected by a gateway rule or A/B test, and the SDK resolves it with `GetConfigurationBundleVersion`. That is why the runtime role gets `bedrock-agentcore:GetConfigurationBundle*` only when the module call defines bundles, and why the module outputs both the bundle ARN and the current version ID.
+
+### Agent Registry namespaces
+
+AWS Agent Registry launched under the `agent-registry` namespace on August 6, 2026. The module uses `awscc_agentregistry_registry` and `awscc_agentregistry_registry_record` and grants `agent-registry:*` actions; the deprecated `aws_bedrockagentcore_registry` resource and the `bedrock-agentcore:*Registry*` actions stop working on October 30, 2026. Records are normally written at run time by a publishing pipeline with the publisher IAM policy the module creates.
+
+## Gateway Target Families and Inbound JWT
+
+### Two gateway families
+
+The service distinguishes gateways by protocol type. An MCP gateway (`protocol_type = "MCP"`, the default) aggregates `LAMBDA` and `MCP_SERVER` targets into one virtual MCP server. A gateway created **without** a protocol type is the front door for HTTP targets: `AGENTCORE_RUNTIME` (requests forwarded to a runtime, no aggregation) and `HTTP_PASSTHROUGH` (any HTTPS endpoint, protocol MCP, A2A, INFERENCE or CUSTOM). Because an `optional(string, "MCP")` attribute cannot be set to null by the caller (null falls back to the default), the module accepts `protocol_type = "NONE"`. Variable validation enforces that each target family lands on the right gateway family and that `protocol_configuration` is only set on MCP gateways.
+
+Two resource types back the two families, the same way CODE and CONTAINER runtimes are two resources. MCP gateways stay `awscc_bedrockagentcore_gateway.gateway` (no state move for existing users). Gateways with `protocol_type = "NONE"` are `aws_bedrockagentcore_gateway.gateway_http`: a real apply showed that the CloudFormation-based awscc resource creates the gateway with the MCP protocol type even when `protocol_type` is null, and the service then rejects HTTP targets ("HTTP target configuration is not supported for gateways with MCP protocol type"). The aws provider resource omits the protocol type when the argument is unset. `locals.tf` merges both into `gateway_arns`, `gateway_identifiers`, `gateway_urls` and `gateway_workload_identity_arns`, which the targets, outputs, debug file, WAF association and placeholder table read. The aws resource has no `waf_configuration`, `advertised_scope_mapping` or interceptor payload filter, so validation rejects those on NONE gateways.
+
+`gateway.tf` renders `target_configuration` with `dynamic "mcp"` and `dynamic "http"` blocks. A `dynamic` block with a single-element `for_each` produces the same configuration as the previous static `mcp {}` block, so existing LAMBDA and MCP_SERVER targets plan no changes.
+
+### Runtime targets and IAM
+
+A runtime target is invoked with the gateway role. Three real applies pinned down the exact shape: a `gateway_iam_role` block with a SigV4 `service` is rejected ("IamCredentialProvider is not supported for this target type"), omitting the block makes the service fill the default in and the aws provider then reports "block count changed from 0 to 1", and an empty `gateway_iam_role {}` block (the provider documentation's own example) is accepted. The module therefore always sends the empty block for `AGENTCORE_RUNTIME` targets unless another credential type is chosen, rejects `gateway_iam_role_config` on them, and gives the gateway role `bedrock-agentcore:InvokeAgentRuntime` on the runtime. For module-managed runtimes (`runtime_name`) the statement uses `runtime/<name>-*`, which matches the runtime and its endpoints without making the gateway role policy depend on the runtime resource; otherwise the gateway (which waits for its role policy) would wait for the runtime build. The runtime ARN itself comes from `local.runtime_arns`, kept separate from `local.placeholder_values` because that table also contains the gateway targets, which would be a dependency cycle.
+
+### Inbound JWT authorization
+
+Runtimes and gateways share the `custom_jwt_authorizer` shape (discovery URL plus at least one of allowed audience, clients, scopes or custom claims). `locals.tf` maps it to the awscc shape once per resource type (`runtime_authorizer_configurations`, `gateway_authorizer_configurations`); the gateway variant adds `advertised_scope_mapping`, the runtime variant adds `allowed_workload_configuration` (restrict callers to a gateway's workload identity). Custom claims are validated by shape: `STRING` claims use `EQUALS` with `match_value_string`, `STRING_ARRAY` claims use `CONTAINS` or `CONTAINS_ANY` with `match_value_string_list`.
+
+### AWS WAF
+
+The gateway resource only carries the failure mode (`FAIL_CLOSE` or `FAIL_OPEN`). The web ACL itself is associated with `aws_wafv2_web_acl_association` against the gateway ARN when `waf_configuration.web_acl_arn` is set; the web ACL must be regional and in the gateway's Region, and the caller needs `wafv2:AssociateWebACL` and `bedrock-agentcore:GatewayAssociateWebACL`.

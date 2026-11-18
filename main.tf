@@ -35,6 +35,20 @@ resource "awscc_bedrockagentcore_runtime" "runtime_code" {
   environment_variables = each.value.environment_variables
   tags                  = merge(local.merged_tags, each.value.tags)
 
+  protocol_configuration = each.value.protocol_configuration
+  platform_version       = each.value.platform_version
+
+  lifecycle_configuration = each.value.lifecycle_configuration != null ? {
+    idle_runtime_session_timeout = each.value.lifecycle_configuration.idle_runtime_session_timeout
+    max_lifetime                 = each.value.lifecycle_configuration.max_lifetime
+  } : null
+
+  request_header_configuration = each.value.request_header_allowlist != null ? {
+    request_header_allowlist = each.value.request_header_allowlist
+  } : null
+
+  authorizer_configuration = local.runtime_authorizer_configurations[each.key]
+
   depends_on = [
     time_sleep.iam_role_propagation,
     terraform_data.build_trigger_code
@@ -56,7 +70,7 @@ resource "awscc_bedrockagentcore_runtime" "runtime_container" {
 
   agent_runtime_artifact = {
     container_configuration = {
-      container_uri = each.value.container_image_uri != null ? each.value.container_image_uri : "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.id}.amazonaws.com/${aws_ecr_repository.runtime[each.key].name}:${each.value.container_image_tag}"
+      container_uri = each.value.container_image_uri != null ? each.value.container_image_uri : "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.region}.amazonaws.com/${aws_ecr_repository.runtime[each.key].name}:${each.value.container_image_tag}"
     }
   }
 
@@ -70,6 +84,20 @@ resource "awscc_bedrockagentcore_runtime" "runtime_container" {
 
   environment_variables = each.value.environment_variables
   tags                  = merge(local.merged_tags, each.value.tags)
+
+  protocol_configuration = each.value.protocol_configuration
+  platform_version       = each.value.platform_version
+
+  lifecycle_configuration = each.value.lifecycle_configuration != null ? {
+    idle_runtime_session_timeout = each.value.lifecycle_configuration.idle_runtime_session_timeout
+    max_lifetime                 = each.value.lifecycle_configuration.max_lifetime
+  } : null
+
+  request_header_configuration = each.value.request_header_allowlist != null ? {
+    request_header_allowlist = each.value.request_header_allowlist
+  } : null
+
+  authorizer_configuration = local.runtime_authorizer_configurations[each.key]
 
   depends_on = [
     terraform_data.build_trigger_container,
@@ -86,8 +114,8 @@ resource "awscc_bedrockagentcore_runtime_endpoint" "runtime" {
     if config.create_endpoint
   }
 
-  name             = "${each.key}_endpoint"
-  description      = each.value.endpoint_description
+  name        = "${each.key}_endpoint"
+  description = each.value.endpoint_description
   agent_runtime_id = try(
     awscc_bedrockagentcore_runtime.runtime_code[each.key].agent_runtime_id,
     awscc_bedrockagentcore_runtime.runtime_container[each.key].agent_runtime_id

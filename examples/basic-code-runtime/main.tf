@@ -10,7 +10,7 @@ module "terraform-aws-agentcore" {
       code_entry_point = ["agent.py"]
       code_runtime     = "PYTHON_3_11"
       description      = "Basic Python agent runtime"
-      
+
       environment_variables = {
         LOG_LEVEL = "INFO"
       }

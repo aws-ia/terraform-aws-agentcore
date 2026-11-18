@@ -71,6 +71,14 @@ module "terraform-aws-agentcore" {
         LOG_LEVEL = "INFO"
       }
       create_endpoint = true
+
+      # Runtime attributes: protocol, session lifecycle and custom request headers
+      protocol_configuration = "HTTP"
+      lifecycle_configuration = {
+        idle_runtime_session_timeout = 900  # 15 minutes
+        max_lifetime                 = 3600 # 1 hour
+      }
+      request_header_allowlist = ["X-Amzn-Bedrock-AgentCore-Runtime-Custom-UserId"]
       tags = {
         RuntimeType = "CODE"
       }
@@ -113,15 +121,21 @@ module "terraform-aws-agentcore" {
   # Gateway for MCP Protocol
   gateways = {
     mcp-gateway = {
-      description       = "Gateway for Model Context Protocol connections"
-      protocol_type     = "MCP"
-      authorizer_type   = "AWS_IAM"
+      description     = "Gateway for Model Context Protocol connections"
+      protocol_type   = "MCP"
+      authorizer_type = "AWS_IAM"
       protocol_configuration = {
         mcp = {
-          instructions        = "Gateway for external service integration"
-          search_type         = "SEMANTIC"
-          supported_versions  = ["2025-11-25"]
+          instructions               = "Gateway for external service integration"
+          search_type                = "SEMANTIC"
+          supported_versions         = ["2025-11-25"]
+          session_timeout_in_seconds = 3600 # MCP session lifetime (900-28800)
+          enable_response_streaming  = true
         }
+      }
+      # AWS WAF failure mode (service default); set web_acl_arn to associate a regional web ACL
+      waf_configuration = {
+        failure_mode = "FAIL_CLOSE"
       }
       tags = {
         Component = "Gateway"
@@ -170,7 +184,7 @@ module "terraform-aws-agentcore" {
     web_browser = {
       description       = "Custom browser for web interaction"
       network_mode      = "PUBLIC"
-      recording_enabled = false  # Disabled - would need S3 bucket
+      recording_enabled = false # Disabled - would need S3 bucket
       tags = {
         Component = "Browser"
       }

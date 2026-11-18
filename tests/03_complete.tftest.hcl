@@ -98,4 +98,15 @@ run "apply_complete" {
     condition     = contains(keys(module.terraform-aws-agentcore.ecr_repository_urls), "container_agent")
     error_message = "Should create ECR repository for container_agent"
   }
+
+  # Runtime and gateway attributes added for v1.1: identities and WAF outputs populated
+  assert {
+    condition     = length(keys(module.terraform-aws-agentcore.runtime_workload_identity_arns)) == 2
+    error_message = "Both runtimes should expose the workload identity AgentCore created for them"
+  }
+
+  assert {
+    condition     = contains(keys(module.terraform-aws-agentcore.gateway_web_acl_arns), "mcp-gateway")
+    error_message = "The gateway should expose its web ACL association output (empty when none)"
+  }
 }
